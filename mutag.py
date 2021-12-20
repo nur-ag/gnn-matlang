@@ -9,10 +9,13 @@ from torch_geometric.nn import (GINConv,global_mean_pool,GATConv,ChebConv,GCNCon
 from libs.spect_conv import SpectConv,ML3Layer
 from libs.utils import MutagDataset,SpectralDesign
 
+from igel_utils import AddLabelTransform, LambdaReduceTransform
+
 torch.manual_seed(0)
   
-transform = SpectralDesign(nmax=28,adddegree=True,recfield=1,dv=4,nfreq=3) 
-dataset = MutagDataset(root="dataset/mutag/",pre_transform=transform)
+transform = SpectralDesign(nmax=28,adddegree=True,recfield=1,dv=4,nfreq=3)
+reduce_transform = LambdaReduceTransform(transform, AddLabelTransform())
+dataset = MutagDataset(root="dataset/mutag/",pre_transform=reduce_transform)
 
 
 class PPGN(nn.Module):
