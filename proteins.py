@@ -21,11 +21,9 @@ import matplotlib.pyplot as plt
 from libs.spect_conv import SpectConv,ML3Layer
 from math import comb
 from libs.utils import ProteinsDataset, SpectralDesign
-torch.manual_seed(0)
 
-
-transform = SpectralDesign(nmax=0,adddegree=True,recfiled=1,dv=4,nfreq=3) 
-dataset = ProteinsDataset(root="dataset/proteins/",pre_transform=transform,contfeat=False)
+import sys
+from igel_utils import IGELPreprocessor, LambdaReduceTransform
 
 
 class GinNet(nn.Module):
@@ -289,84 +287,98 @@ class GNNML3(nn.Module):
         return F.log_softmax(self.fc2(x), dim=1)
 
 
-device = torch.device('cpu' if torch.cuda.is_available() else 'cpu')
-NB=np.zeros((500,10))
+MODELS = [GatNet, ChebNet, GcnNet, GinNet, MlpNet, GNNML1, GNNML3]
+models = {m.__name__.lower(): m for m in MODELS}
 
-testsize=0
-for fold in range(0,10):
+if __name__ == '__main__':
+    seed = int(sys.argv[1].strip()) if len(sys.argv) > 1 else 0
+    distance = int(sys.argv[2].strip()) if len(sys.argv) > 2 else 1
+    vector_length = int(sys.argv[3].strip()) if len(sys.argv) > 3 else 1
+    model_class = models[sys.argv[4].lower().strip() if len(sys.argv) > 4 else 'gnnml3']
+    igel = IGELPreprocessor(seed, distance, vector_length)
+    torch.manual_seed(seed)
 
-    
-    tsid=np.loadtxt('dataset/proteins/raw/10fold_idx/test_idx-'+str(fold+1)+'.txt')
-    trid=np.loadtxt('dataset/proteins/raw/10fold_idx/train_idx-'+str(fold+1)+'.txt')
-    trid=trid.astype(np.int)
-    tsid=tsid.astype(np.int)
+    transform = SpectralDesign(nmax=0,adddegree=True,recfield=1,dv=4,nfreq=3) 
+    dataset = ProteinsDataset(root="dataset/proteins/",pre_transform=transform,contfeat=False, igel_preprocessor=igel)
 
-    ds=dataset.copy()
-    d=dataset[[i for i in trid]].copy()
-    ds.data.x=(ds.data.x-d.data.x.mean(0))/d.data.x.std(0)
-    mn=d.data.x.mean(0)
-    st=d.data.x.std(0)
+    device = torch.device('cpu' if torch.cuda.is_available() else 'cpu')
+    NB=np.zeros((500,10))
 
-    bsize=180
-    train_loader = DataLoader(ds[[i for i in trid]], batch_size=bsize, shuffle=True)    
-    test_loader  = DataLoader(ds[[i for i in tsid]], batch_size=60, shuffle=False)
+    testsize=0
+    for fold in range(0,10):
 
-    
-    model = GNNML3().to(device)   # GatNet  ChebNet  GcnNet  GinNet  MlpNet  GNNML1 GNNML3       
-
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.001) 
-
-    trsize=trid.shape[0]    
-    tssize=tsid.shape[0]
-
-    testsize+=tssize
-
-    def train(epoch):
-        model.train()
-        L=0
-        correct = 0
-        for data in train_loader:
-            data = data.to(device)
-            optimizer.zero_grad()
-            pred = model(data)
-            lss=F.nll_loss(pred, data.y,reduction='sum')            
-            lss.backward()            
-            optimizer.step()
-            L+=lss.cpu().detach().numpy()
-            pred = pred.max(1)[1]
-            correct += pred.eq(data.y).sum().item()
         
-        return correct/trsize,L/trsize
+        tsid=np.loadtxt('dataset/proteins/raw/10fold_idx/test_idx-'+str(fold+1)+'.txt')
+        trid=np.loadtxt('dataset/proteins/raw/10fold_idx/train_idx-'+str(fold+1)+'.txt')
+        trid=trid.astype(np.int)
+        tsid=tsid.astype(np.int)
 
+        ds=dataset.copy()
+        d=dataset[[i for i in trid]].copy()
+        ds.data.x=(ds.data.x-d.data.x.mean(0))/d.data.x.std(0)
+        mn=d.data.x.mean(0)
+        st=d.data.x.std(0)
 
-    def test():
-        model.eval()
-        correct = 0
-        L=0
-        for data in test_loader:
-            data = data.to(device)
-            pred = model(data)
+        bsize=180
+        train_loader = DataLoader(ds[[i for i in trid]], batch_size=bsize, shuffle=True)    
+        test_loader  = DataLoader(ds[[i for i in tsid]], batch_size=60, shuffle=False)
+
+        
+        model = model_class().to(device)   # GatNet  ChebNet  GcnNet  GinNet  MlpNet  GNNML1 GNNML3       
+
+        optimizer = torch.optim.Adam(model.parameters(), lr=0.001) 
+
+        trsize=trid.shape[0]    
+        tssize=tsid.shape[0]
+
+        testsize+=tssize
+
+        def train(epoch):
+            model.train()
+            L=0
+            correct = 0
+            for data in train_loader:
+                data = data.to(device)
+                optimizer.zero_grad()
+                pred = model(data)
+                lss=F.nll_loss(pred, data.y,reduction='sum')            
+                lss.backward()            
+                optimizer.step()
+                L+=lss.cpu().detach().numpy()
+                pred = pred.max(1)[1]
+                correct += pred.eq(data.y).sum().item()
             
-            lss=F.nll_loss(pred, data.y,reduction='sum')
-            L+=lss.cpu().detach().numpy()
-            pred = pred.max(1)[1]
-            correct += pred.eq(data.y).sum().item()
+            return correct/trsize,L/trsize
+
+
+        def test():
+            model.eval()
+            correct = 0
+            L=0
+            for data in test_loader:
+                data = data.to(device)
+                pred = model(data)
                 
-        return correct,L/tssize
-       
-    bval=1000
-    btest=0
-    for epoch in range(1, 51):
-        tracc,trloss=train(epoch)
-        test_acc,test_loss = test()     
-        NB[epoch,fold]=test_acc   
-        #print('Epoch: {:02d}, trloss: {:.4f},  Val: {:.4f}, Test: {:.4f}'.format(epoch,trloss,val_acc, test_acc))
-        print('{:02d} Epoch: {:02d}, trloss: {:.4f}, tracc: {:.4f}, Testloss: {:.4f}, Test acc: {:.4f}'.format(fold,epoch,trloss,tracc,test_loss,test_acc))
+                lss=F.nll_loss(pred, data.y,reduction='sum')
+                L+=lss.cpu().detach().numpy()
+                pred = pred.max(1)[1]
+                correct += pred.eq(data.y).sum().item()
+                    
+            return correct,L/tssize
+           
+        bval=1000
+        btest=0
+        for epoch in range(1, 51):
+            tracc,trloss=train(epoch)
+            test_acc,test_loss = test()     
+            NB[epoch,fold]=test_acc   
+            #print('Epoch: {:02d}, trloss: {:.4f},  Val: {:.4f}, Test: {:.4f}'.format(epoch,trloss,val_acc, test_acc))
+            print('{:02d} Epoch: {:02d}, trloss: {:.4f}, tracc: {:.4f}, Testloss: {:.4f}, Test acc: {:.4f}'.format(fold,epoch,trloss,tracc,test_loss,test_acc))
 
+        print(NB.sum(1).max()/testsize)
+
+    #import pandas as pd
+    #pd.DataFrame(NB).to_csv('protein')
     print(NB.sum(1).max()/testsize)
+    #plt.plot(NB.sum(1));plt.show()
 
-import pandas as pd
-pd.DataFrame(NB).to_csv('protein')
-print(NB.sum(1).max()/testsize)
-plt.plot(NB.sum(1));plt.show()
-a=1

@@ -1,4 +1,3 @@
-
 from torch_geometric.data import DataLoader
 import torch
 import numpy as np
@@ -9,13 +8,8 @@ from torch_geometric.nn import (GINConv,global_mean_pool,GATConv,ChebConv,GCNCon
 from libs.spect_conv import SpectConv,ML3Layer
 from libs.utils import MutagDataset,SpectralDesign
 
-from igel_utils import AddLabelTransform, LambdaReduceTransform
-
-torch.manual_seed(0)
-  
-transform = SpectralDesign(nmax=28,adddegree=True,recfield=1,dv=4,nfreq=3)
-reduce_transform = LambdaReduceTransform(transform, AddLabelTransform())
-dataset = MutagDataset(root="dataset/mutag/",pre_transform=reduce_transform)
+import sys
+from igel_utils import IGELPreprocessor, LambdaReduceTransform
 
 
 class PPGN(nn.Module):
@@ -309,86 +303,99 @@ class GNNML3(nn.Module):
         x = F.relu(self.fc1(x))
         return self.fc2(x)
 
+MODELS = [GatNet, ChebNet, GcnNet, GinNet, MlpNet, PPGN, GNNML1, GNNML3]
+models = {m.__name__.lower(): m for m in MODELS}
 
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-NB=np.zeros((500,10))
+if __name__ == '__main__':
+    seed = int(sys.argv[1].strip()) if len(sys.argv) > 1 else 0
+    distance = int(sys.argv[2].strip()) if len(sys.argv) > 2 else 1
+    vector_length = int(sys.argv[3].strip()) if len(sys.argv) > 3 else 1
+    model_class = models[sys.argv[4].lower().strip() if len(sys.argv) > 4 else 'gnnml3']
+    igel = IGELPreprocessor(seed, distance, vector_length)
+    torch.manual_seed(seed)
+  
+    transform = SpectralDesign(nmax=28,adddegree=True,recfield=1,dv=4,nfreq=3)
+    dataset = MutagDataset(root="dataset/mutag/",pre_transform=transform, igel_preprocessor=igel)
 
-testsize=0
-for fold in range(0,10):
-    tsid=np.loadtxt('dataset/mutag/raw/10fold_idx/test_idx-'+str(fold+1)+'.txt')
-    trid=np.loadtxt('dataset/mutag/raw/10fold_idx/train_idx-'+str(fold+1)+'.txt')
-    trid=trid.astype(np.int)
-    tsid=tsid.astype(np.int)
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    NB=np.zeros((500,10))
 
-    bsize=16
-    train_loader = DataLoader(dataset[[i for i in trid]], batch_size=bsize, shuffle=True)    
-    test_loader  = DataLoader(dataset[[i for i in tsid]], batch_size=18, shuffle=False)
-    
-    model = GNNML3().to(device)   # GatNet  ChebNet  GcnNet  GinNet  MlpNet  PPGN GNNML1 GNNML3
+    testsize=0
+    for fold in range(0, 10):
+        tsid=np.loadtxt('dataset/mutag/raw/10fold_idx/test_idx-'+str(fold+1)+'.txt')
+        trid=np.loadtxt('dataset/mutag/raw/10fold_idx/train_idx-'+str(fold+1)+'.txt')
+        trid=trid.astype(np.int)
+        tsid=tsid.astype(np.int)
 
-    def weights_init(m):
-        if isinstance(m, nn.Conv2d):
-            torch.nn.init.xavier_uniform_(m.weight)
-            if m.bias is not None:
-                torch.nn.init.zeros_(m.bias)         
-    model.apply(weights_init)
-
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.001) #,weight_decay=0.0001)
-
-    trsize=trid.shape[0]    
-    tssize=tsid.shape[0]
-
-    testsize+=tssize
-
-    def train(epoch):
-        model.train()    
-        L=0
-        correct=0
-        for data in train_loader:
-            data = data.to(device)
-            optimizer.zero_grad()
-            y_grd= (data.y) #.type(torch.long) 
-            pre=model(data)
-            pred=F.sigmoid(pre)
-            #lss=F.nll_loss(pred, y_grd,reduction='sum')
-            lss=F.binary_cross_entropy(pred[:,0], y_grd,reduction='sum')
-            
-            lss.backward()
-            optimizer.step()
-            
-            correct += torch.round(pred[:,0]).eq(y_grd).sum().item()
-
-            L+=lss.item()
-        return correct/trsize,L/trsize
-
-    def test():
-        model.eval()
-        correct = 0
-        L=0
-        for data in test_loader:
-            data = data.to(device)
-            pre=model(data)
-            pred=F.sigmoid(pre)
-            y_grd= (data.y)
-            correct += torch.round(pred[:,0]).eq(y_grd).sum().item()
-            
-            lss=F.binary_cross_entropy(pred[:,0], y_grd,reduction='sum')
-            L+=lss.cpu().detach().numpy()
-
-        s1= correct 
+        bsize=16
+        train_loader = DataLoader(dataset[[i for i in trid]], batch_size=bsize, shuffle=True)
+        test_loader  = DataLoader(dataset[[i for i in tsid]], batch_size=18, shuffle=False)
         
-        return s1,L/tssize
+        model = model_class().to(device)   # GatNet  ChebNet  GcnNet  GinNet  MlpNet  PPGN GNNML1 GNNML3
+
+        def weights_init(m):
+            if isinstance(m, nn.Conv2d):
+                torch.nn.init.xavier_uniform_(m.weight)
+                if m.bias is not None:
+                    torch.nn.init.zeros_(m.bias)         
+        model.apply(weights_init)
+
+        optimizer = torch.optim.Adam(model.parameters(), lr=0.001) #,weight_decay=0.0001)
+
+        trsize=trid.shape[0]    
+        tssize=tsid.shape[0]
+
+        testsize+=tssize
+
+        def train(epoch):
+            model.train()    
+            L=0
+            correct=0
+            for data in train_loader:
+                data = data.to(device)
+                optimizer.zero_grad()
+                y_grd= (data.y) #.type(torch.long) 
+                pre=model(data)
+                pred=F.sigmoid(pre)
+                #lss=F.nll_loss(pred, y_grd,reduction='sum')
+                lss=F.binary_cross_entropy(pred[:,0], y_grd,reduction='sum')
+                
+                lss.backward()
+                optimizer.step()
+                
+                correct += torch.round(pred[:,0]).eq(y_grd).sum().item()
+
+                L+=lss.item()
+            return correct/trsize,L/trsize
+
+        def test():
+            model.eval()
+            correct = 0
+            L=0
+            for data in test_loader:
+                data = data.to(device)
+                pre=model(data)
+                pred=F.sigmoid(pre)
+                y_grd= (data.y)
+                correct += torch.round(pred[:,0]).eq(y_grd).sum().item()
+                
+                lss=F.binary_cross_entropy(pred[:,0], y_grd,reduction='sum')
+                L+=lss.cpu().detach().numpy()
+
+            s1= correct 
+            
+            return s1,L/tssize
+           
+        bval=1000
+        btest=0
+        for epoch in range(1, 101):
+            tracc,trloss=train(epoch)
+            test_acc,test_loss = test()     
+            NB[epoch,fold]=test_acc   
+            #print('Epoch: {:02d}, trloss: {:.4f},  Val: {:.4f}, Test: {:.4f}'.format(epoch,trloss,val_acc, test_acc))
+            print('{:02d} Epoch: {:02d}, trloss: {:.4f}, tracc: {:.4f}, Testloss: {:.4f}, Test acc: {:.4f} ({:.4f})'.format(fold,epoch,trloss,tracc,test_loss,test_acc,test_acc/tssize))
        
-    bval=1000
-    btest=0
-    for epoch in range(1, 101):
-        tracc,trloss=train(epoch)
-        test_acc,test_loss = test()     
-        NB[epoch,fold]=test_acc   
-        #print('Epoch: {:02d}, trloss: {:.4f},  Val: {:.4f}, Test: {:.4f}'.format(epoch,trloss,val_acc, test_acc))
-        print('{:02d} Epoch: {:02d}, trloss: {:.4f}, tracc: {:.4f}, Testloss: {:.4f}, Test acc: {:.4f}'.format(fold,epoch,trloss,tracc,test_loss,test_acc))
-   
-iter=NB.sum(1).argmax()
-print((NB[iter,:]*100/18).mean())
-print((NB[iter,:]*100/18).std())
+    iter=NB.sum(1).argmax()
+    print((NB[iter,:]*100/18).mean())
+    print((NB[iter,:]*100/18).std())
 

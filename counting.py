@@ -11,25 +11,8 @@ from libs.utils import GraphCountDataset,SpectralDesign,get_n_params
 import scipy.io as sio
 from sklearn.metrics import r2_score
 
-
-
-transform = SpectralDesign(nmax=30,recfield=1,dv=1,nfreq=10,adddegree=True,laplacien=False,addadj=True)
-dataset = GraphCountDataset(root="dataset/subgraphcount/",pre_transform=transform)
-
-# normalize outputs
-dataset.data.y=(dataset.data.y/dataset.data.y.std(0))
-# normalize degree of the node
-dataset.data.x[:,1]=dataset.data.x[:,1]/dataset.data.x[:,1].max()
-
-a=sio.loadmat('dataset/subgraphcount/raw/randomgraph.mat')
-trid=a['train_idx'][0]
-vlid=a['val_idx'][0]
-tsid=a['test_idx'][0]
-
-train_loader = DataLoader(dataset[[i for i in trid]], batch_size=10, shuffle=True)
-val_loader = DataLoader(dataset[[i for i in vlid]], batch_size=100, shuffle=False)
-test_loader = DataLoader(dataset[[i for i in tsid]], batch_size=100, shuffle=False)
-
+import sys
+from igel_utils import IGELPreprocessor, LambdaReduceTransform
 
 
 class PPGN(torch.nn.Module):
@@ -372,85 +355,109 @@ class GNNML3(nn.Module):
         return self.fc2(x)
 
 
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+MODELS = [GatNet, ChebNet, GcnNet, GinNet, MlpNet, GNNML1, GNNML3]
+models = {m.__name__.lower(): m for m in MODELS}
 
-# select your model
-model = GNNML3().to(device)   # GatNet  ChebNet  GcnNet  GinNet  MlpNet  PPGN  GNNML1  GNNML3
+if __name__ == '__main__':
+    seed = int(sys.argv[1].strip()) if len(sys.argv) > 1 else 0
+    distance = int(sys.argv[2].strip()) if len(sys.argv) > 2 else 1
+    vector_length = int(sys.argv[3].strip()) if len(sys.argv) > 3 else 1
+    model_class = models[sys.argv[4].lower().strip() if len(sys.argv) > 4 else 'gnnml3']
+    task = int(sys.argv[5].strip()) if len(sys.argv) > 5 else 0
+    igel = IGELPreprocessor(seed, distance, vector_length)
+    torch.manual_seed(seed)
 
-# select task, 0: triangle, 1: tailed_triangle 2: star  3: 4-cycle  4:custom
-ntask=0
+    transform = SpectralDesign(nmax=30,recfield=1,dv=1,nfreq=10,adddegree=True,laplacien=False,addadj=True)
+    dataset = GraphCountDataset(root="dataset/subgraphcount/",pre_transform=transform, igel_preprocessor=igel)
 
+    # normalize outputs
+    dataset.data.y=(dataset.data.y/dataset.data.y.std(0))
+    # normalize degree of the node
+    dataset.data.x[:,1]=dataset.data.x[:,1]/dataset.data.x[:,1].max()
 
+    a=sio.loadmat('dataset/subgraphcount/raw/randomgraph.mat')
+    trid=a['train_idx'][0]
+    vlid=a['val_idx'][0]
+    tsid=a['test_idx'][0]
 
-print('number of parameters:',get_n_params(model))
+    train_loader = DataLoader(dataset[[i for i in trid]], batch_size=10, shuffle=True)
+    val_loader = DataLoader(dataset[[i for i in vlid]], batch_size=100, shuffle=False)
+    test_loader = DataLoader(dataset[[i for i in tsid]], batch_size=100, shuffle=False)
 
-# be sure PPGN's bias are initialized by zero
-def weights_init(m):
-    if isinstance(m, nn.Conv2d):
-        torch.nn.init.xavier_uniform_(m.weight)
-        if m.bias is not None:
-            torch.nn.init.zeros_(m.bias)         
-                
-model.apply(weights_init)
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+    # select your model
+    model = model_class().to(device)   # GatNet  ChebNet  GcnNet  GinNet  MlpNet  PPGN  GNNML1  GNNML3
 
+    # select task, 0: triangle, 1: tailed_triangle 2: star  3: 4-cycle  4:custom
+    ntask=0
+    print('number of parameters:',get_n_params(model))
 
+    # be sure PPGN's bias are initialized by zero
+    def weights_init(m):
+        if isinstance(m, nn.Conv2d):
+            torch.nn.init.xavier_uniform_(m.weight)
+            if m.bias is not None:
+                torch.nn.init.zeros_(m.bias)         
+                    
+    model.apply(weights_init)
 
-def train(epoch):
-    model.train()
-    
-    L=0
-    correct=0
-    for data in train_loader:
-        data = data.to(device)
-        optimizer.zero_grad()
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+
+    def train(epoch):
+        model.train()
         
-        pre=model(data)
+        L=0
+        correct=0
+        for data in train_loader:
+            data = data.to(device)
+            optimizer.zero_grad()
+            
+            pre=model(data)
+            
+            lss= torch.square(pre- data.y[:,ntask:ntask+1]).sum() 
+            
+            lss.backward()
+            optimizer.step()  
+            L+=lss.item()
+
+        return L/len(trid)
+
+    def test():
+        model.eval()
+        yhat=[]
+        ygrd=[]
+        L=0
+        for data in test_loader:
+            data = data.to(device)
+
+            pre=model(data)
+            yhat.append(pre.cpu().detach())
+            ygrd.append(data.y[:,ntask:ntask+1].cpu().detach())
+            lss= torch.square(pre- data.y[:,ntask:ntask+1]).sum()         
+            L+=lss.item()
+        yhat=torch.cat(yhat)
+        ygrd=torch.cat(ygrd)
+        testr2=r2_score(ygrd.numpy(),yhat.numpy())
+
+        Lv=0
+        for data in val_loader:
+            data = data.to(device)
+            pre=model(data)
+            lss= torch.square(pre- data.y[:,ntask:ntask+1]).sum() 
+            Lv+=lss.item()    
+        return L/len(tsid), Lv/len(vlid),testr2
+
+    bval=1000
+    btest=0
+    btestr2=0
+    for epoch in range(1, 1001):
+        trloss=train(epoch)
+        test_loss,val_loss,testr2 = test()
+        if bval>val_loss:
+            bval=val_loss
+            btest=test_loss
+            btestr2=testr2
         
-        lss= torch.square(pre- data.y[:,ntask:ntask+1]).sum() 
-        
-        lss.backward()
-        optimizer.step()  
-        L+=lss.item()
-
-    return L/len(trid)
-
-def test():
-    model.eval()
-    yhat=[]
-    ygrd=[]
-    L=0
-    for data in test_loader:
-        data = data.to(device)
-
-        pre=model(data)
-        yhat.append(pre.cpu().detach())
-        ygrd.append(data.y[:,ntask:ntask+1].cpu().detach())
-        lss= torch.square(pre- data.y[:,ntask:ntask+1]).sum()         
-        L+=lss.item()
-    yhat=torch.cat(yhat)
-    ygrd=torch.cat(ygrd)
-    testr2=r2_score(ygrd.numpy(),yhat.numpy())
-
-    Lv=0
-    for data in val_loader:
-        data = data.to(device)
-        pre=model(data)
-        lss= torch.square(pre- data.y[:,ntask:ntask+1]).sum() 
-        Lv+=lss.item()    
-    return L/len(tsid), Lv/len(vlid),testr2
-
-bval=1000
-btest=0
-btestr2=0
-for epoch in range(1, 1001):
-    trloss=train(epoch)
-    test_loss,val_loss,testr2 = test()
-    if bval>val_loss:
-        bval=val_loss
-        btest=test_loss
-        btestr2=testr2
-    
-    print('Epoch: {:02d}, trloss: {:.6f},  Valloss: {:.6f}, Testloss: {:.6f}, best test loss: {:.6f}, bestr2:{:.6f}'.format(epoch,trloss,val_loss,test_loss,btest,btestr2))
+        print('Epoch: {:02d}, trloss: {:.6f},  Valloss: {:.6f}, Testloss: {:.6f}, best test loss: {:.6f}, bestr2:{:.6f}'.format(epoch,trloss,val_loss,test_loss,btest,btestr2))
 

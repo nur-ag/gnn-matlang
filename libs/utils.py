@@ -22,7 +22,8 @@ def get_n_params(model):
 
 
 class PtcDataset(InMemoryDataset):
-    def __init__(self, root, transform=None, pre_transform=None):
+    def __init__(self, root, transform=None, pre_transform=None, igel_preprocessor=None):
+        self.igel_preprocessor = igel_preprocessor
         
         super(PtcDataset, self).__init__(root, transform, pre_transform)
         
@@ -34,7 +35,11 @@ class PtcDataset(InMemoryDataset):
 
     @property
     def processed_file_names(self):
-        return 'data.pt'
+        igel = self.igel_preprocessor
+        if igel:
+            return f'data-igel-d{igel.distance}-s{igel.seed}-v{igel.vector_length}.pt'
+        else:
+            return 'data.pt'
 
     def download(self):
         # Download to `self.raw_dir`.
@@ -65,11 +70,15 @@ class PtcDataset(InMemoryDataset):
         if self.pre_transform is not None:
             data_list = [self.pre_transform(data) for data in data_list]
 
+        if self.igel_preprocessor is not None:
+            data_list = self.igel_preprocessor(data_list)
+
         data, slices = self.collate(data_list)
         torch.save((data, slices), self.processed_paths[0])
 
 class ProteinsDataset(InMemoryDataset):
-    def __init__(self, root, transform=None, pre_transform=None,contfeat=False):
+    def __init__(self, root, transform=None, pre_transform=None, igel_preprocessor=None,contfeat=False):
+        self.igel_preprocessor = igel_preprocessor
         self.contfeat=contfeat
         super(ProteinsDataset, self).__init__(root, transform, pre_transform)
         
@@ -81,7 +90,11 @@ class ProteinsDataset(InMemoryDataset):
 
     @property
     def processed_file_names(self):
-        return 'data.pt'
+        igel = self.igel_preprocessor
+        if igel:
+            return f'data-igel-d{igel.distance}-s{igel.seed}-v{igel.vector_length}.pt'
+        else:
+            return 'data.pt'
 
     def download(self):
         # Download to `self.raw_dir`.
@@ -117,12 +130,16 @@ class ProteinsDataset(InMemoryDataset):
         if self.pre_transform is not None:
             data_list = [self.pre_transform(data) for data in data_list]
 
+        if self.igel_preprocessor is not None:
+            data_list = self.igel_preprocessor(data_list)
+
         data, slices = self.collate(data_list)
         torch.save((data, slices), self.processed_paths[0])
 
 
 class EnzymesDataset(InMemoryDataset):
-    def __init__(self, root, transform=None, pre_transform=None,contfeat=False):
+    def __init__(self, root, transform=None, pre_transform=None, igel_preprocessor=None,contfeat=False):
+        self.igel_preprocessor = igel_preprocessor
         self.contfeat=contfeat
         super(EnzymesDataset, self).__init__(root, transform, pre_transform)
         
@@ -134,7 +151,11 @@ class EnzymesDataset(InMemoryDataset):
 
     @property
     def processed_file_names(self):
-        return 'data.pt'
+        igel = self.igel_preprocessor
+        if igel:
+            return f'data-igel-d{igel.distance}-s{igel.seed}-v{igel.vector_length}.pt'
+        else:
+            return 'data.pt'
 
     def download(self):
         # Download to `self.raw_dir`.
@@ -169,11 +190,15 @@ class EnzymesDataset(InMemoryDataset):
         if self.pre_transform is not None:
             data_list = [self.pre_transform(data) for data in data_list]
 
+        if self.igel_preprocessor is not None:
+            data_list = self.igel_preprocessor(data_list)
+
         data, slices = self.collate(data_list)
         torch.save((data, slices), self.processed_paths[0])
 
 class MutagDataset(InMemoryDataset):
-    def __init__(self, root, transform=None, pre_transform=None):
+    def __init__(self, root, transform=None, pre_transform=None, igel_preprocessor=None):
+        self.igel_preprocessor = igel_preprocessor
         super(MutagDataset, self).__init__(root, transform, pre_transform)
         self.data, self.slices = torch.load(self.processed_paths[0])
 
@@ -183,7 +208,11 @@ class MutagDataset(InMemoryDataset):
 
     @property
     def processed_file_names(self):
-        return 'data.pt'
+        igel = self.igel_preprocessor
+        if igel:
+            return f'data-igel-d{igel.distance}-s{igel.seed}-v{igel.vector_length}.pt'
+        else:
+            return 'data.pt'
 
     def download(self):
         # Download to `self.raw_dir`.
@@ -214,11 +243,15 @@ class MutagDataset(InMemoryDataset):
         if self.pre_transform is not None:
             data_list = [self.pre_transform(data) for data in data_list]
 
+        if self.igel_preprocessor is not None:
+            data_list = self.igel_preprocessor(data_list)
+
         data, slices = self.collate(data_list)
         torch.save((data, slices), self.processed_paths[0])
 
 class Zinc12KDataset(InMemoryDataset):
-    def __init__(self, root, transform=None, pre_transform=None):
+    def __init__(self, root, transform=None, pre_transform=None, igel_preprocessor=None):
+        self.igel_preprocessor = igel_preprocessor
         super(Zinc12KDataset, self).__init__(root, transform, pre_transform)
         self.data, self.slices = torch.load(self.processed_paths[0])
 
@@ -228,7 +261,11 @@ class Zinc12KDataset(InMemoryDataset):
 
     @property
     def processed_file_names(self):
-        return 'data.pt'
+        igel = self.igel_preprocessor
+        if igel:
+            return f'data-igel-d{igel.distance}-s{igel.seed}-v{igel.vector_length}.pt'
+        else:
+            return 'data.pt'
 
     def download(self):
         # Download to `self.raw_dir`.
@@ -266,11 +303,15 @@ class Zinc12KDataset(InMemoryDataset):
         if self.pre_transform is not None:
             data_list = [self.pre_transform(data) for data in data_list]
 
+        if self.igel_preprocessor is not None:
+            data_list = self.igel_preprocessor(data_list)
+
         data, slices = self.collate(data_list)
         torch.save((data, slices), self.processed_paths[0])
 
 class BandClassDataset(InMemoryDataset):
-    def __init__(self, root, transform=None, pre_transform=None):
+    def __init__(self, root, transform=None, pre_transform=None, igel_preprocessor=None):
+        self.igel_preprocessor = igel_preprocessor
         super(BandClassDataset, self).__init__(root, transform, pre_transform)
         self.data, self.slices = torch.load(self.processed_paths[0])
 
@@ -280,7 +321,11 @@ class BandClassDataset(InMemoryDataset):
 
     @property
     def processed_file_names(self):
-        return 'data.pt'
+        igel = self.igel_preprocessor
+        if igel:
+            return f'data-igel-d{igel.distance}-s{igel.seed}-v{igel.vector_length}.pt'
+        else:
+            return 'data.pt'
 
     def download(self):
         # Download to `self.raw_dir`.
@@ -310,11 +355,15 @@ class BandClassDataset(InMemoryDataset):
         if self.pre_transform is not None:
             data_list = [self.pre_transform(data) for data in data_list]
 
+        if self.igel_preprocessor is not None:
+            data_list = self.igel_preprocessor(data_list)
+
         data, slices = self.collate(data_list)
         torch.save((data, slices), self.processed_paths[0])
 
 class TwoDGrid30(InMemoryDataset):
-    def __init__(self, root, transform=None, pre_transform=None):
+    def __init__(self, root, transform=None, pre_transform=None, igel_preprocessor=None):
+        self.igel_preprocessor = igel_preprocessor
         super(TwoDGrid30, self).__init__(root, transform, pre_transform)
         self.data, self.slices = torch.load(self.processed_paths[0])
 
@@ -324,7 +373,11 @@ class TwoDGrid30(InMemoryDataset):
 
     @property
     def processed_file_names(self):
-        return 'data.pt'
+        igel = self.igel_preprocessor
+        if igel:
+            return f'data-igel-d{igel.distance}-s{igel.seed}-v{igel.vector_length}.pt'
+        else:
+            return 'data.pt'
 
     def download(self):
         # Download to `self.raw_dir`.
@@ -360,11 +413,15 @@ class TwoDGrid30(InMemoryDataset):
         if self.pre_transform is not None:
             data_list = [self.pre_transform(data) for data in data_list]
 
+        if self.igel_preprocessor is not None:
+            data_list = self.igel_preprocessor(data_list)
+
         data, slices = self.collate(data_list)
         torch.save((data, slices), self.processed_paths[0])
 
 class GraphCountDataset(InMemoryDataset):
-    def __init__(self, root, transform=None, pre_transform=None):
+    def __init__(self, root, transform=None, pre_transform=None, igel_preprocessor=None):
+        self.igel_preprocessor = igel_preprocessor
         super(GraphCountDataset, self).__init__(root, transform, pre_transform)
         self.data, self.slices = torch.load(self.processed_paths[0])
 
@@ -374,7 +431,11 @@ class GraphCountDataset(InMemoryDataset):
 
     @property
     def processed_file_names(self):
-        return 'data.pt'
+        igel = self.igel_preprocessor
+        if igel:
+            return f'data-igel-d{igel.distance}-s{igel.seed}-v{igel.vector_length}.pt'
+        else:
+            return 'data.pt'
 
     def download(self):
         # Download to `self.raw_dir`.
@@ -418,11 +479,15 @@ class GraphCountDataset(InMemoryDataset):
         if self.pre_transform is not None:
             data_list = [self.pre_transform(data) for data in data_list]
 
+        if self.igel_preprocessor is not None:
+            data_list = self.igel_preprocessor(data_list)
+
         data, slices = self.collate(data_list)
         torch.save((data, slices), self.processed_paths[0])
 
 class PlanarSATPairsDataset(InMemoryDataset):
-    def __init__(self, root, transform=None, pre_transform=None, pre_filter=None):
+    def __init__(self, root, transform=None, pre_transform=None, igel_preprocessor=None, pre_filter=None):
+        self.igel_preprocessor = igel_preprocessor
         super(PlanarSATPairsDataset, self).__init__(root, transform, pre_transform, pre_filter)
         self.data, self.slices = torch.load(self.processed_paths[0])
 
@@ -432,7 +497,11 @@ class PlanarSATPairsDataset(InMemoryDataset):
 
     @property
     def processed_file_names(self):
-        return 'data.pt'
+        igel = self.igel_preprocessor
+        if igel:
+            return f'data-igel-d{igel.distance}-s{igel.seed}-v{igel.vector_length}.pt'
+        else:
+            return 'data.pt'
 
     def download(self):
         pass  
@@ -447,11 +516,15 @@ class PlanarSATPairsDataset(InMemoryDataset):
         if self.pre_transform is not None:
             data_list = [self.pre_transform(data) for data in data_list]
 
+        if self.igel_preprocessor is not None:
+            data_list = self.igel_preprocessor(data_list)
+
         data, slices = self.collate(data_list)
         torch.save((data, slices), self.processed_paths[0])
 
 class Grapg8cDataset(InMemoryDataset):
-    def __init__(self, root, transform=None, pre_transform=None):
+    def __init__(self, root, transform=None, pre_transform=None, igel_preprocessor=None):
+        self.igel_preprocessor = igel_preprocessor
         super(Grapg8cDataset, self).__init__(root, transform, pre_transform)
         self.data, self.slices = torch.load(self.processed_paths[0])
 
@@ -461,7 +534,11 @@ class Grapg8cDataset(InMemoryDataset):
 
     @property
     def processed_file_names(self):
-        return 'data.pt'
+        igel = self.igel_preprocessor
+        if igel:
+            return f'data-igel-d{igel.distance}-s{igel.seed}-v{igel.vector_length}.pt'
+        else:
+            return 'data.pt'
 
     def download(self):
         # Download to `self.raw_dir`.
@@ -483,11 +560,15 @@ class Grapg8cDataset(InMemoryDataset):
         if self.pre_transform is not None:
             data_list = [self.pre_transform(data) for data in data_list]
 
+        if self.igel_preprocessor is not None:
+            data_list = self.igel_preprocessor(data_list)
+
         data, slices = self.collate(data_list)
         torch.save((data, slices), self.processed_paths[0])
 
 class SRDataset(InMemoryDataset):
-    def __init__(self, root, transform=None, pre_transform=None):
+    def __init__(self, root, transform=None, pre_transform=None, igel_preprocessor=None):
+        self.igel_preprocessor = igel_preprocessor
         super(SRDataset, self).__init__(root, transform, pre_transform)
         self.data, self.slices = torch.load(self.processed_paths[0])
 
@@ -497,7 +578,11 @@ class SRDataset(InMemoryDataset):
 
     @property
     def processed_file_names(self):
-        return 'data.pt'
+        igel = self.igel_preprocessor
+        if igel:
+            return f'data-igel-d{igel.distance}-s{igel.seed}-v{igel.vector_length}.pt'
+        else:
+            return 'data.pt'
 
     def download(self):
         # Download to `self.raw_dir`.
@@ -518,6 +603,9 @@ class SRDataset(InMemoryDataset):
 
         if self.pre_transform is not None:
             data_list = [self.pre_transform(data) for data in data_list]
+
+        if self.igel_preprocessor is not None:
+            data_list = self.igel_preprocessor(data_list)
 
         data, slices = self.collate(data_list)
         torch.save((data, slices), self.processed_paths[0])
