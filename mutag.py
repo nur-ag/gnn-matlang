@@ -311,11 +311,10 @@ if __name__ == '__main__':
     distance = int(sys.argv[2].strip()) if len(sys.argv) > 2 else 1
     vector_length = int(sys.argv[3].strip()) if len(sys.argv) > 3 else 1
     model_class = models[sys.argv[4].lower().strip() if len(sys.argv) > 4 else 'gnnml3']
-    igel = IGELPreprocessor(seed, distance, vector_length)
     torch.manual_seed(seed)
   
     transform = SpectralDesign(nmax=28,adddegree=True,recfield=1,dv=4,nfreq=3)
-    dataset = MutagDataset(root="dataset/mutag/",pre_transform=transform, igel_preprocessor=igel)
+    dataset = MutagDataset(root="dataset/mutag/",pre_transform=transform)
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     NB=np.zeros((500,10))
@@ -327,6 +326,14 @@ if __name__ == '__main__':
         trid=trid.astype(np.int)
         tsid=tsid.astype(np.int)
 
+        # Add IGEL embeddings
+        igel = IGELPreprocessor(seed, distance, vector_length)
+        data_pre_igel = dataset.data.clone()
+        train_data = dataset[[i for i in trid]]
+        data_with_igel = igel(data_pre_igel, train_data)
+        dataset.data = data_with_igel
+
+        # Follow the normal logic
         bsize=16
         train_loader = DataLoader(dataset[[i for i in trid]], batch_size=bsize, shuffle=True)
         test_loader  = DataLoader(dataset[[i for i in tsid]], batch_size=18, shuffle=False)
@@ -346,6 +353,8 @@ if __name__ == '__main__':
         tssize=tsid.shape[0]
 
         testsize+=tssize
+
+        dataset.data = data_pre_igel
 
         def train(epoch):
             model.train()    
