@@ -22,11 +22,9 @@ import matplotlib.pyplot as plt
 from libs.spect_conv import SpectConv,ML3Layer
 from math import comb
 from libs.utils import EnzymesDataset,SpectralDesign
-torch.manual_seed(123)
 
-
-transform = SpectralDesign(nmax=126,adddegree=True,recfield=1,dv=2,nfreq=3)  
-dataset = EnzymesDataset(root="dataset/enzymes/",pre_transform=transform,contfeat=True)
+import sys
+from igel_utils import IGELPreprocessor, LambdaReduceTransform
 
 
 class PPGN(nn.Module):
@@ -349,9 +347,19 @@ class GNNML1(nn.Module):
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
+MODELS = [GatNet, ChebNet, GcnNet, GinNet, MlpNet, PPGN, GNNML1]
+models = {m.__name__.lower(): m for m in MODELS}
 
-for sim in range(0,10):
-    torch.manual_seed(sim)
+if __name__ == '__main__':
+    seed = int(sys.argv[1].strip()) if len(sys.argv) > 1 else 0
+    distance = int(sys.argv[2].strip()) if len(sys.argv) > 2 else 1
+    vector_length = int(sys.argv[3].strip()) if len(sys.argv) > 3 else 1
+    model_class = models[sys.argv[4].lower().strip() if len(sys.argv) > 4 else 'gatnet']
+    torch.manual_seed(seed)
+
+    transform = SpectralDesign(nmax=126,adddegree=True,recfield=1,dv=2,nfreq=3)  
+    dataset = EnzymesDataset(root="dataset/enzymes/",pre_transform=transform,contfeat=True)
+
     NB=np.zeros((500,10))
 
     testsize=0
@@ -363,6 +371,14 @@ for sim in range(0,10):
         trid=trid.astype(np.int)
         tsid=tsid.astype(np.int)
 
+        # Add IGEL embeddings
+        igel = IGELPreprocessor(seed, distance, vector_length)
+        data_pre_igel = dataset.data.clone()
+        train_data = dataset[[i for i in trid]]
+        data_with_igel = igel(data_pre_igel, train_data)
+        dataset.data = data_with_igel
+
+        # Follow the normal logic
         ds=dataset.copy()
         d=dataset[[i for i in trid]].copy()
         ds.data.x=(ds.data.x-d.data.x.mean(0))/d.data.x.std(0)
@@ -375,7 +391,7 @@ for sim in range(0,10):
         test_loader  = DataLoader(ds[[i for i in tsid]], batch_size=60, shuffle=False)
 
         
-        model = ChebNet().to(device)   # GatNet  ChebNet  GcnNet  GinNet  MlpNet  PPGN GNNML1 
+        model = model_class().to(device)   # GatNet  ChebNet  GcnNet  GinNet  MlpNet  PPGN GNNML1 
         
         def weights_init(m):
             if isinstance(m, nn.Conv2d):
@@ -391,6 +407,8 @@ for sim in range(0,10):
         tssize=tsid.shape[0]
 
         testsize+=tssize
+
+        dataset.data = data_pre_igel
 
         def train(epoch):
             model.train()
@@ -435,8 +453,8 @@ for sim in range(0,10):
             print('{:02d} Epoch: {:02d}, trloss: {:.4f}, tracc: {:.4f}, Testloss: {:.4f}, Test acc: {:.4f}'.format(fold,epoch,trloss,tracc,test_loss,test_acc))
         print(NB.sum(1).max()/testsize)
         a=1
-    import pandas as pd
-    pd.DataFrame(NB).to_csv('enz-fulfeat-ml3-'+str(sim)+'_'+str(NB.sum(1).max()))
+    #import pandas as pd
+    #pd.DataFrame(NB).to_csv('enz-fulfeat-ml3-'+str(seed)+'_'+str(NB.sum(1).max()))
     print(NB.sum(1).max()/testsize)
     #plt.plot(NB.sum(1));plt.show()
     a=1

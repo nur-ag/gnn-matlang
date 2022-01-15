@@ -364,11 +364,10 @@ if __name__ == '__main__':
     vector_length = int(sys.argv[3].strip()) if len(sys.argv) > 3 else 1
     model_class = models[sys.argv[4].lower().strip() if len(sys.argv) > 4 else 'gnnml3']
     task = int(sys.argv[5].strip()) if len(sys.argv) > 5 else 0
-    igel = IGELPreprocessor(seed, distance, vector_length)
     torch.manual_seed(seed)
 
     transform = SpectralDesign(nmax=30,recfield=1,dv=1,nfreq=10,adddegree=True,laplacien=False,addadj=True)
-    dataset = GraphCountDataset(root="dataset/subgraphcount/",pre_transform=transform, igel_preprocessor=igel)
+    dataset = GraphCountDataset(root="dataset/subgraphcount/",pre_transform=transform)
 
     # normalize outputs
     dataset.data.y=(dataset.data.y/dataset.data.y.std(0))
@@ -380,6 +379,14 @@ if __name__ == '__main__':
     vlid=a['val_idx'][0]
     tsid=a['test_idx'][0]
 
+    # Add IGEL embeddings
+    igel = IGELPreprocessor(seed, distance, vector_length)
+    data_pre_igel = dataset.data.clone()
+    train_data = dataset[[i for i in trid]]
+    data_with_igel = igel(data_pre_igel, train_data)
+    dataset.data = data_with_igel
+
+    # Follow the normal logic
     train_loader = DataLoader(dataset[[i for i in trid]], batch_size=10, shuffle=True)
     val_loader = DataLoader(dataset[[i for i in vlid]], batch_size=100, shuffle=False)
     test_loader = DataLoader(dataset[[i for i in tsid]], batch_size=100, shuffle=False)

@@ -28,40 +28,44 @@ class IGELPreprocessor:
         self.edge_feature_map = edge_feature_map
         self.edge_fn = edge_fn
 
-    def __call__(self, data):
+    def __call__(self, data, training_data=None):
         if self.distance < 1:
             return data
 
+        if training_data is None:
+            training_data = data
+
         # We have something to preprocess since distance is nonzero
-        data = Batch.from_data_list(data)
-        G = self.global_graph(data)
+        data_list = data
+        training_data_list = Batch.from_data_list(training_data)
+        G = self.global_graph(training_data_list)
         model = self.train_igel_model(G)
 
         # Detach the embeddings so that we don't backprop at all -- harder baseline!
-        embeddings = torch.Tensor(model(G.vs, G).cpu().detach().numpy())
-
+        G_inference = self.global_graph(data_list)
+        embeddings = torch.Tensor(model(G_inference.vs, G_inference).cpu().detach().numpy())
 
         # Add node features where required
         for field in self.node_feature_fields:
-            base_features = getattr(data, field, None)
+            base_features = getattr(data_list, field, None)
             if base_features is None:
                 continue
             concat_result = torch.cat([base_features, embeddings], axis=-1)
-            setattr(data, field, concat_result)
+            setattr(data_list, field, concat_result)
 
         # Add edge features where required
         if self.edge_feature_map:
             for index_field, feature_field in self.edge_feature_map.items():
-                edge_indices = getattr(data, index_field, None)
-                edge_attr = getattr(data, feature_field, None)
+                edge_indices = getattr(data_list, index_field, None)
+                edge_attr = getattr(data_list, feature_field, None)
                 if edge_indices is None or edge_attr is None:
                     continue
 
                 edge_pair_emb = embeddings[edge_indices]
                 edge_emb = self.edge_fn(edge_pair_emb[0], edge_pair_emb[1])
                 concat_result = torch.cat([edge_attr, edge_emb], axis=-1)
-                setattr(data, feature_field, concat_result)
-        return data.to_data_list()
+                setattr(data_list, feature_field, concat_result)
+        return data_list
 
     def global_graph(self, data):
         edges = data.edge_index2
