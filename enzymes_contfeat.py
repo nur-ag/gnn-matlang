@@ -20,7 +20,7 @@ import os
 import matplotlib.pyplot as plt
 
 from libs.spect_conv import SpectConv,ML3Layer
-from math import comb
+from scipy.special import comb
 from libs.utils import EnzymesDataset,SpectralDesign
 
 import sys
