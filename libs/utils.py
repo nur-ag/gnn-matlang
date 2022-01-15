@@ -8,7 +8,7 @@ import networkx as nx
 import pickle
 import os
 import scipy.io as sio
-from math import comb
+from scipy.special import comb
 
 
 def get_n_params(model):

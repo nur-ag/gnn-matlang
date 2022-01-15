@@ -19,7 +19,7 @@ import pickle
 import os
 import matplotlib.pyplot as plt
 from libs.spect_conv import SpectConv,ML3Layer
-from math import comb
+from scipy.special import comb
 from libs.utils import EnzymesDataset,SpectralDesign
 
 import sys
@@ -482,6 +482,3 @@ if __name__ == '__main__':
     iter=NB.sum(1).argmax()
     print((NB[iter,:]*100/60).mean())
     print((NB[iter,:]*100/60).std())
-    import pandas as pd
-    pd.DataFrame(NB).to_csv('dd')
-    plt.plot(NB.sum(1));plt.show()
