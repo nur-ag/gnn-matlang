@@ -3,3 +3,4 @@ __pycache__
 results
 results-whole-set
 dataset/*/processed/
+venv/
