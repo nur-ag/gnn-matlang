@@ -456,5 +456,6 @@ if __name__ == '__main__':
     #import pandas as pd
     #pd.DataFrame(NB).to_csv('enz-fulfeat-ml3-'+str(seed)+'_'+str(NB.sum(1).max()))
     print(NB.sum(1).max()/testsize)
+    print(0.0)
     #plt.plot(NB.sum(1));plt.show()
     a=1
