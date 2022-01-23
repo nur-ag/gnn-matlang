@@ -392,12 +392,13 @@ if __name__ == '__main__':
     distance = int(sys.argv[2].strip()) if len(sys.argv) > 2 else 1
     vector_length = int(sys.argv[3].strip()) if len(sys.argv) > 3 else 1
     model_class = models[sys.argv[4].lower().strip() if len(sys.argv) > 4 else 'gnnml3']
+    try_cuda = sys.argv[5] == 'cuda' if len(sys.argv) > 5 else True
     torch.manual_seed(seed)
 
     transform = SpectralDesign(nmax=126,adddegree=True,recfield=1,dv=2,nfreq=4)  
     dataset = EnzymesDataset(root="dataset/enzymes/",pre_transform=transform,contfeat=False)
 
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    device = torch.device('cuda' if torch.cuda.is_available() and try_cuda else 'cpu')
     NB=np.zeros((5000,10))
 
     testsize=0

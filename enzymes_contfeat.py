@@ -344,9 +344,6 @@ class GNNML1(nn.Module):
         return F.log_softmax(self.fc2(x), dim=1)
 
 
-
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
 MODELS = [GatNet, ChebNet, GcnNet, GinNet, MlpNet, PPGN, GNNML1]
 models = {m.__name__.lower(): m for m in MODELS}
 
@@ -355,7 +352,10 @@ if __name__ == '__main__':
     distance = int(sys.argv[2].strip()) if len(sys.argv) > 2 else 1
     vector_length = int(sys.argv[3].strip()) if len(sys.argv) > 3 else 1
     model_class = models[sys.argv[4].lower().strip() if len(sys.argv) > 4 else 'gatnet']
+    try_cuda = sys.argv[5] == 'cuda' if len(sys.argv) > 5 else True
     torch.manual_seed(seed)
+
+    device = torch.device('cuda' if torch.cuda.is_available()  and try_cuda else 'cpu')
 
     transform = SpectralDesign(nmax=126,adddegree=True,recfield=1,dv=2,nfreq=3)  
     dataset = EnzymesDataset(root="dataset/enzymes/",pre_transform=transform,contfeat=True)

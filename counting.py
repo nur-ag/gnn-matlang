@@ -363,7 +363,8 @@ if __name__ == '__main__':
     distance = int(sys.argv[2].strip()) if len(sys.argv) > 2 else 1
     vector_length = int(sys.argv[3].strip()) if len(sys.argv) > 3 else 1
     model_class = models[sys.argv[4].lower().strip() if len(sys.argv) > 4 else 'gnnml3']
-    task = int(sys.argv[5].strip()) if len(sys.argv) > 5 else 0
+    try_cuda = sys.argv[5] == 'cuda' if len(sys.argv) > 5 else True
+    task = int(sys.argv[6].strip()) if len(sys.argv) > 6 else 0
     torch.manual_seed(seed)
 
     transform = SpectralDesign(nmax=30,recfield=1,dv=1,nfreq=10,adddegree=True,laplacien=False,addadj=True)
@@ -391,7 +392,7 @@ if __name__ == '__main__':
     val_loader = DataLoader(dataset[[i for i in vlid]], batch_size=100, shuffle=False)
     test_loader = DataLoader(dataset[[i for i in tsid]], batch_size=100, shuffle=False)
 
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    device = torch.device('cuda' if torch.cuda.is_available() and try_cuda else 'cpu')
 
     # select your model
     model = model_class().to(device)   # GatNet  ChebNet  GcnNet  GinNet  MlpNet  PPGN  GNNML1  GNNML3
