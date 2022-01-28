@@ -299,14 +299,13 @@ if __name__ == '__main__':
     torch.manual_seed(seed)
 
     transform = SpectralDesign(nmax=0,adddegree=True,recfield=1,dv=4,nfreq=3) 
-    dataset = ProteinsDataset(root="dataset/proteins/",pre_transform=transform,contfeat=False)
 
     device = torch.device('cuda' if torch.cuda.is_available() and try_cuda else 'cpu')
     NB=np.zeros((500,10))
 
     testsize=0
     for fold in range(0,10):
-
+        dataset = ProteinsDataset(root="dataset/proteins/",pre_transform=transform,contfeat=False)
         
         tsid=np.loadtxt('dataset/proteins/raw/10fold_idx/test_idx-'+str(fold+1)+'.txt')
         trid=np.loadtxt('dataset/proteins/raw/10fold_idx/train_idx-'+str(fold+1)+'.txt')

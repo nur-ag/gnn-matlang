@@ -315,13 +315,13 @@ if __name__ == '__main__':
     torch.manual_seed(seed)
   
     transform = SpectralDesign(nmax=28,adddegree=True,recfield=1,dv=4,nfreq=3)
-    dataset = MutagDataset(root="dataset/mutag/",pre_transform=transform)
 
     device = torch.device('cuda' if torch.cuda.is_available() and try_cuda else 'cpu')
     NB=np.zeros((500,10))
 
     testsize=0
     for fold in range(0, 10):
+        dataset = MutagDataset(root="dataset/mutag/",pre_transform=transform)
         tsid=np.loadtxt('dataset/mutag/raw/10fold_idx/test_idx-'+str(fold+1)+'.txt')
         trid=np.loadtxt('dataset/mutag/raw/10fold_idx/train_idx-'+str(fold+1)+'.txt')
         trid=trid.astype(np.int)
