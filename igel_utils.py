@@ -12,7 +12,13 @@ sys.path.append('../IGEL/gnnml-comparisons')
 class IGELPreprocessor:
     '''A preprocessor to include IGEL (neighbourhood structure) node/edge features.
 
-    If the `model` parameter is None, a model is trained during initialization.
+    Args:
+        seed (int): random seed to pass to the unsupervised IGEL training job.
+        distance (int): IGEL encoding distance. If set to less than 1, this preprocessor is a no-op.
+        vector_length (int): length of the learned unsupervised IGEL embeddings. If set to a negative number, use IGEL structural encoding features (no training).
+        node_feature_fields (list[string]): list of names for fields containing node features.
+        edge_feature_map (dict[string, string]): dictionary mapping edge index fields to edge attribute fields.
+        edge_fn (function(tensor, tensor) :-> tensor): a function applied to node features when computing edge feature vectors. 
     '''
     def __init__(self, 
             seed=0, 
@@ -24,6 +30,7 @@ class IGELPreprocessor:
         self.distance = distance
         self.seed = seed
         self.vector_length = vector_length
+        self.use_encoding = vector_length < 0
         self.node_feature_fields = node_feature_fields
         self.edge_feature_map = edge_feature_map
         self.edge_fn = edge_fn
@@ -106,11 +113,35 @@ class IGELPreprocessor:
         return G
 
     def train_igel_model(self, G):
-        from igel_embedder import get_unsupervised_embedder
-        return get_unsupervised_embedder(G, 
+        # Note: Imported from IGEL.gnnml-comparisons
+        from igel_embedder import get_unsupervised_embedder, TRAINING_OPTIONS
+        import torch.nn as nn
+
+        # Do not train if we are using the encoding
+        embedder_length = self.vector_length
+        if self.use_encoding:
+            TRAINING_OPTIONS.epochs = 0
+            embedder_length = 0
+
+        # Get the model using the modified training options (with/without epochs)
+        trained_model = get_unsupervised_embedder(G, 
                                          self.distance, 
                                          self.seed,
-                                         self.vector_length)
+                                         embedder_length,
+                                         train_opts=TRAINING_OPTIONS)
+
+        # If we are using encodings, override the parameter matrix
+        if self.use_encoding:
+            encoder = trained_model.structural_mapper
+            embedder_length = encoder.num_elements()
+
+            # Using encodings: simply replace the learned embedding matrix with an identity matrix
+            # This will return the structural features as-is.
+            input_identity = torch.eye(embedder_length)
+            trained_model.matrix = nn.Parameter(input_identity, requires_grad=False).to(trained_model.device)
+            trained_model.output_size = embedder_length
+        print(f'Prepared IGEL model (encoding-only: {self.use_encoding}) with {embedder_length} features.')
+        return trained_model
 
 
 class AddLabelTransform:
