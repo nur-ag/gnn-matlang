@@ -12,13 +12,8 @@ import numpy as np
 from libs.spect_conv import SpectConv,ML3Layer
 from libs.utils import PlanarSATPairsDataset,SpectralDesign
 
-
-transform = SpectralDesign(nmax=64,recfield=1,dv=2,nfreq=5,adddegree=True)
-dataset = PlanarSATPairsDataset(root="dataset/EXP/",pre_transform=transform)
-
-val_loader   = DataLoader(dataset[0:200], batch_size=50, shuffle=False)
-test_loader  = DataLoader(dataset[200:400], batch_size=50, shuffle=False)
-train_loader = DataLoader(dataset[400:1200], batch_size=50, shuffle=True)
+import sys
+from igel_utils import IGELPreprocessor, LambdaReduceTransform
 
 
 class PPGN(torch.nn.Module):
@@ -295,89 +290,118 @@ class GNNML3(nn.Module):
         return self.fc2(x)
 
 
+MODELS = [GatNet, ChebNet, GcnNet, GinNet, MlpNet, PPGN, GNNML1, GNNML3]
+models = {m.__name__.lower(): m for m in MODELS}
+
+if __name__ == '__main__':
+    seed = int(sys.argv[1].strip()) if len(sys.argv) > 1 else 0
+    distance = int(sys.argv[2].strip()) if len(sys.argv) > 2 else 1
+    vector_length = int(sys.argv[3].strip()) if len(sys.argv) > 3 else 1
+    model_class = models[sys.argv[4].lower().strip() if len(sys.argv) > 4 else 'gnnml3']
+    try_cuda = sys.argv[5] == 'cuda' if len(sys.argv) > 5 else True
+    torch.manual_seed(seed)
+
+    device = torch.device('cuda' if torch.cuda.is_available() and try_cuda else 'cpu')
+
+    transform = SpectralDesign(nmax=64,recfield=1,dv=2,nfreq=5,adddegree=True)
+    dataset = PlanarSATPairsDataset(root="dataset/EXP/",pre_transform=transform)
+
+    # For similarity, training is not necessary as random init should be enough
+    sys.path.append('../IGEL/src')
+    sys.path.append('../IGEL/gnnml-comparisons')
+    from igel_embedder import TRAINING_OPTIONS
+    TRAINING_OPTIONS.epochs = 0
+
+    # Add IGEL embeddings
+    igel = IGELPreprocessor(seed, distance, vector_length)
+    data_pre_igel = dataset.data.clone()
+    train_data = dataset[[i for i in range(400, 1200)]]
+    data_with_igel = igel(data_pre_igel, train_data)
+    dataset.data = data_with_igel
+
+    # select your model
+    model = model_class().to(device)   # GatNet  ChebNet  GcnNet  GinNet  MlpNet  PPGN  GNNML1  GNNML3
+
+    val_loader   = DataLoader(dataset[0:200], batch_size=50, shuffle=False)
+    test_loader  = DataLoader(dataset[200:400], batch_size=50, shuffle=False)
+    train_loader = DataLoader(dataset[400:1200], batch_size=50, shuffle=True)
+
+    # be sure PPGN's bias are initialized by zero
+    def weights_init(m):
+        if isinstance(m, nn.Conv2d):
+            torch.nn.init.xavier_uniform_(m.weight)
+            if m.bias is not None:
+                torch.nn.init.zeros_(m.bias)         
+                    
+    model.apply(weights_init)
+
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
 
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
-# select your model
-model = GNNML3().to(device)   # GatNet  ChebNet  GcnNet  GinNet  MlpNet  PPGN  GNNML1  GNNML3
-
-
-# be sure PPGN's bias are initialized by zero
-def weights_init(m):
-    if isinstance(m, nn.Conv2d):
-        torch.nn.init.xavier_uniform_(m.weight)
-        if m.bias is not None:
-            torch.nn.init.zeros_(m.bias)         
-                
-model.apply(weights_init)
-
-optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-
-
-def train(epoch):
-    model.train()
-    
-    L=0
-    correct=0
-    for data in train_loader:
-        data = data.to(device)
-        optimizer.zero_grad()
-        y_grd= (data.y).type(torch.float) 
-        pre=model(data)
-        pred=torch.sigmoid(pre)              
-        lss=F.binary_cross_entropy(pred, y_grd.unsqueeze(-1),reduction='sum')
+    def train(epoch):
+        model.train()
         
-        lss.backward()
-        optimizer.step()
-        
-        correct += torch.round(pred[:,0]).eq(y_grd).sum().item()
+        L=0
+        correct=0
+        for data in train_loader:
+            data = data.to(device)
+            optimizer.zero_grad()
+            y_grd= (data.y).type(torch.float) 
+            pre=model(data)
+            pred=torch.sigmoid(pre)              
+            lss=F.binary_cross_entropy(pred, y_grd.unsqueeze(-1),reduction='sum')
+            
+            lss.backward()
+            optimizer.step()
+            
+            correct += torch.round(pred[:,0]).eq(y_grd).sum().item()
 
-        L+=lss.item()
-    return correct/800,L/800
+            L+=lss.item()
+        return correct/800,L/800
 
-def test():
-    model.eval()
-    correct = 0
-    L=0
-    for data in test_loader:
-        data = data.to(device)
-        pre=model(data)
-        pred=torch.sigmoid(pre)
-        y_grd= (data.y).type(torch.float) 
-        correct += torch.round(pred[:,0]).eq(y_grd).sum().item()
+    def test():
+        model.eval()
+        correct = 0
+        L=0
+        for data in test_loader:
+            data = data.to(device)
+            pre=model(data)
+            pred=torch.sigmoid(pre)
+            y_grd= (data.y).type(torch.float) 
+            correct += torch.round(pred[:,0]).eq(y_grd).sum().item()
 
-        
-        lss=F.binary_cross_entropy(pred, y_grd.unsqueeze(-1),reduction='sum')
-        L+=lss.item()
-    L=L/200
-    s1= correct / 200
-    correct = 0
-    Lv=0
-    for data in val_loader:
-        data = data.to(device)
-        pre=model(data)
-        pred=torch.sigmoid(pre)
-        y_grd= (data.y).type(torch.float) 
-        correct += torch.round(pred[:,0]).eq(y_grd).sum().item()
+            
+            lss=F.binary_cross_entropy(pred, y_grd.unsqueeze(-1),reduction='sum')
+            L+=lss.item()
+        L=L/200
+        s1= correct / 200
+        correct = 0
+        Lv=0
+        for data in val_loader:
+            data = data.to(device)
+            pre=model(data)
+            pred=torch.sigmoid(pre)
+            y_grd= (data.y).type(torch.float) 
+            correct += torch.round(pred[:,0]).eq(y_grd).sum().item()
 
-        lss=F.binary_cross_entropy(pred, y_grd.unsqueeze(-1),reduction='sum')
-        Lv+=lss.item()
-    s2= correct / 200    
-    Lv=Lv/200
+            lss=F.binary_cross_entropy(pred, y_grd.unsqueeze(-1),reduction='sum')
+            Lv+=lss.item()
+        s2= correct / 200    
+        Lv=Lv/200
 
-    return s1,L, s2, Lv
+        return s1,L, s2, Lv
 
-bval=1000
-btest=0
-for epoch in range(1, 1001):
-    tracc,trloss=train(epoch)
-    test_acc,test_loss,val_acc,val_loss = test()
-    if bval>val_loss:
-        bval=val_loss
-        btest=test_acc    
-    print('Epoch: {:02d}, trloss: {:.4f}, tracc: {:.4f}, Valloss: {:.4f}, Val acc: {:.4f},Testloss: {:.4f}, Test acc: {:.4f},best test acc: {:.4f}'.format(epoch,trloss,tracc,val_loss,val_acc,test_loss,test_acc,btest))
+    bval=1000
+    btest=0
+    for epoch in range(1, 1001):
+        tracc,trloss=train(epoch)
+        test_acc,test_loss,val_acc,val_loss = test()
+        if bval>val_loss:
+            bval=val_loss
+            btest=test_acc    
+        print('Epoch: {:02d}, trloss: {:.4f}, tracc: {:.4f}, Valloss: {:.4f}, Val acc: {:.4f},Testloss: {:.4f}, Test acc: {:.4f},best test acc: {:.4f}'.format(epoch,trloss,tracc,val_loss,val_acc,test_loss,test_acc,btest))
 
+    print(btest, 0.0)
 
 
 

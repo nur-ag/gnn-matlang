@@ -12,10 +12,9 @@ import numpy as np
 from libs.spect_conv import SpectConv,ML3Layer
 from libs.utils import SRDataset,SpectralDesign
 
+import sys
+from igel_utils import IGELPreprocessor, LambdaReduceTransform
 
-transform = SpectralDesign(nmax=25,recfield=1,dv=2,nfreq=5,adddegree=True)
-dataset = SRDataset(root="dataset/sr25/",pre_transform=transform)
-train_loader = DataLoader(dataset, batch_size=100, shuffle=False)
 
 class PPGN(torch.nn.Module):
     def __init__(self,nmax=25,nneuron=32):
@@ -278,25 +277,55 @@ class GNNML3(nn.Module):
         return x
 
 
-M=0
-for iter in range(0,10):
-    torch.manual_seed(iter)
+MODELS = [GatNet, ChebNet, GcnNet, GinNet, MlpNet, PPGN, GNNML1, GNNML3]
+models = {m.__name__.lower(): m for m in MODELS}
 
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    
-    # select your model
-    model = PPGN().to(device)   # GatNet  ChebNet  GcnNet  GinNet  MlpNet  PPGN  GNNML1  GNNML3
+if __name__ == '__main__':
+    seed = int(sys.argv[1].strip()) if len(sys.argv) > 1 else 0
+    distance = int(sys.argv[2].strip()) if len(sys.argv) > 2 else 1
+    vector_length = int(sys.argv[3].strip()) if len(sys.argv) > 3 else 1
+    model_class = models[sys.argv[4].lower().strip() if len(sys.argv) > 4 else 'gnnml3']
+    try_cuda = sys.argv[5] == 'cuda' if len(sys.argv) > 5 else True
+    torch.manual_seed(seed)
 
-    embeddings=[]
-    model.eval()
-    for data in train_loader:
-        data = data.to(device)
-        pre=model(data)
-        embeddings.append(pre)
+    device = torch.device('cuda' if torch.cuda.is_available() and try_cuda else 'cpu')
 
-    E=torch.cat(embeddings).cpu().detach().numpy()    
-    M=M+1*((np.abs(np.expand_dims(E,1)-np.expand_dims(E,0))).sum(2)>0.001)
-    sm=((M==0).sum()-M.shape[0])/2
-    print('similar:',sm)
+    transform = SpectralDesign(nmax=25,recfield=1,dv=2,nfreq=5,adddegree=True)
+    dataset = SRDataset(root="dataset/sr25/",pre_transform=transform)
+
+    # For similarity, training is not necessary as random init should be enough
+    sys.path.append('../IGEL/src')
+    sys.path.append('../IGEL/gnnml-comparisons')
+    from igel_embedder import TRAINING_OPTIONS
+    TRAINING_OPTIONS.epochs = 0
+
+    # Add IGEL embeddings
+    igel = IGELPreprocessor(seed, distance, vector_length)
+    full_data = dataset.data.clone()
+    dataset.data = igel(full_data, dataset)
+
+    # Follow the normal logic
+    train_loader = DataLoader(dataset, batch_size=100, shuffle=False)
+
+    M=0
+    NUM_ITER = 10
+    for iter in range(0,NUM_ITER):
+        torch.manual_seed(iter)
+        
+        # select your model
+        model = model_class().to(device)   # GatNet  ChebNet  GcnNet  GinNet  MlpNet  PPGN  GNNML1  GNNML3
+
+        embeddings=[]
+        model.eval()
+        for data in train_loader:
+            data = data.to(device)
+            pre=model(data)
+            embeddings.append(pre)
+
+        E=torch.cat(embeddings).cpu().detach().numpy()    
+        M=M+1*((np.abs(np.expand_dims(E,1)-np.expand_dims(E,0))).sum(2)>0.001)
+        sm=((M==0).sum()-M.shape[0])/2
+        print('similar:',sm)
+    print(sm, 0.0)
 
     
