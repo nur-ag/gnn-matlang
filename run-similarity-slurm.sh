@@ -1,9 +1,9 @@
 #!/bin/bash
-#SBATCH -J GNN-Count
+#SBATCH -J GNN-Sim
 #SBATCH -p high
 #SBATCH -n 1 #number of tasks
 #SBATCH -c 1
-#SBATCH --mem=32768
+#SBATCH --mem=16384
 #SBATCH --array=1-210:1
 #SBATCH --output=results/execution_logs/run.%A_%a.out
 
@@ -14,19 +14,18 @@ module load PyTorch-Geometric/2.0.2-foss-2020b-PyTorch-1.10.0
 export PYTHONPATH="/homedtic/fnalvarez/.local/lib/python3.8/site-packages/:$PYTHONPATH"
 
 # Output directory defaults to results
-OUTPUT_DIR=${1:-results/counting/}
+OUTPUT_DIR=${1:-results/similarity/}
 
 # Experiment constants
-SCRIPT='counting'
 MAX_SEED=10
 DEVICE='cpu' # We use CPU (slower) since it lets us run more jobs in parallel
 
 # Generate all the commands and their outputs
 COMMANDS_ARRAY=()
 OUTPUTS_ARRAY=()
-for SCRIPT_TASK in `seq 0 4`
+for SCRIPT in "exp_classify" "graph8c" "sr25"
 do
-  for MODEL_TYPE in "gatnet" "gcnnet" "ginnet" "chebnet" "mlpnet" "gnnml1" "gnnml3"
+  for MODEL_TYPE in "gatnet" "gcnnet" "ginnet" "chebnet" "mlpnet" "gnnml3"
   do
     for SEED in `seq 1 $MAX_SEED`
     do
@@ -35,9 +34,9 @@ do
         LENGTHS="0" && [[ $DISTANCE -gt 0 ]] && LENGTHS="-1 5 10"
         for VECTOR_LENGTH in $LENGTHS
         do
-          CMD="python ${SCRIPT}.py $SEED $DISTANCE $VECTOR_LENGTH $MODEL_TYPE $DEVICE $SCRIPT_TASK";
+          CMD="python ${SCRIPT}.py $SEED $DISTANCE $VECTOR_LENGTH $MODEL_TYPE $DEVICE";
           LENGTH_OR_ENC="${VECTOR_LENGTH}" && [[ $VECTOR_LENGTH -le 0 ]] && LENGTH_OR_ENC="Encoding"
-          OUTPUT="$OUTPUT_DIR/${SCRIPT}-${SEED}-${DISTANCE}-${LENGTH_OR_ENC}-${MODEL_TYPE}-${DEVICE}-${SCRIPT_TASK}.txt"
+          OUTPUT="$OUTPUT_DIR/${SCRIPT}-${SEED}-${DISTANCE}-${LENGTH_OR_ENC}-${MODEL_TYPE}-${DEVICE}.txt"
           COMMANDS_ARRAY+=("$CMD")
           OUTPUTS_ARRAY+=("$OUTPUT")
         done
@@ -46,7 +45,7 @@ do
   done
 done
 # Total combinations/experiments:
-# 1 scripts x 7 models x 10 seeds x 3 distances x 3 lengths x 4 tasks = 2520
+# 2 scripts x 6 models x 10 seeds x 3 distances x 3 lengths = 1080
 TOTAL_EXPERIMENTS=${#COMMANDS_ARRAY[@]}
 TOTAL_PROCESSES=$SLURM_ARRAY_TASK_COUNT
 
@@ -69,4 +68,3 @@ else
     eval "${COMMANDS_ARRAY[$i]} > ${OUTPUTS_ARRAY[$i]}"
   done
 fi
-
