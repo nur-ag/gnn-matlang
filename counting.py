@@ -398,7 +398,7 @@ if __name__ == '__main__':
     model = model_class().to(device)   # GatNet  ChebNet  GcnNet  GinNet  MlpNet  PPGN  GNNML1  GNNML3
 
     # select task, 0: triangle, 1: tailed_triangle 2: star  3: 4-cycle  4:custom
-    ntask=0
+    ntask=task
     print('number of parameters:',get_n_params(model))
 
     # be sure PPGN's bias are initialized by zero
