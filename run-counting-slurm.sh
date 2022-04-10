@@ -32,7 +32,7 @@ do
     do
       for DISTANCE in `seq 0 2`
       do
-        LENGTHS="0" && [[ $DISTANCE -gt 0 ]] && LENGTHS="-1 5 10"
+        LENGTHS="0" && [[ $DISTANCE -gt 0 ]] && LENGTHS="-1 10"
         for VECTOR_LENGTH in $LENGTHS
         do
           CMD="python ${SCRIPT}.py $SEED $DISTANCE $VECTOR_LENGTH $MODEL_TYPE $DEVICE $SCRIPT_TASK";

@@ -6,7 +6,7 @@ import torch.nn.functional as F
 from torch.nn import Sequential, Linear, ReLU
 import torch_geometric.transforms as T
 from torch_geometric.data import DataLoader
-from torch_geometric.nn import (GINConv,global_mean_pool,GATConv,ChebConv,GCNConv)
+from torch_geometric.nn import (GINConv,global_mean_pool,global_add_pool,GATConv,ChebConv,GCNConv)
 
 import numpy as np
 from libs.spect_conv import SpectConv,ML3Layer
@@ -289,8 +289,19 @@ class GNNML3(nn.Module):
         x = F.relu(self.fc1(x))
         return self.fc2(x)
 
+class LinearNet(nn.Module):
+    def __init__(self):
+        super(LinearNet, self).__init__()
+        self.fc1 = torch.nn.Linear(dataset.num_features, 1)
+        
+    def forward(self, data):
+        x=data.x
+        edge_index=data.edge_index
+        x = global_add_pool(x, data.batch)
+        return self.fc1(x)
 
-MODELS = [GatNet, ChebNet, GcnNet, GinNet, MlpNet, PPGN, GNNML1, GNNML3]
+
+MODELS = [LinearNet, GatNet, ChebNet, GcnNet, GinNet, MlpNet, PPGN, GNNML1, GNNML3]
 models = {m.__name__.lower(): m for m in MODELS}
 
 if __name__ == '__main__':
@@ -393,14 +404,22 @@ if __name__ == '__main__':
 
     bval=1000
     btest=0
+    MAX_REPEATS = 50
+    last_bval = None
+    repeat_iters = 0
     for epoch in range(1, 1001):
         tracc,trloss=train(epoch)
         test_acc,test_loss,val_acc,val_loss = test()
         if bval>val_loss:
             bval=val_loss
-            btest=test_acc    
+            btest=test_acc
+            last_bval = bval
+            repeat_iters = 0
+        repeat_iters += 1
+        if repeat_iters > MAX_REPEATS:
+            print(f'Finished early after {MAX_REPEATS} repeats.')
+            break
         print('Epoch: {:02d}, trloss: {:.4f}, tracc: {:.4f}, Valloss: {:.4f}, Val acc: {:.4f},Testloss: {:.4f}, Test acc: {:.4f},best test acc: {:.4f}'.format(epoch,trloss,tracc,val_loss,val_acc,test_loss,test_acc,btest))
-
     print(btest, 0.0)
 
 

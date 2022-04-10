@@ -276,8 +276,20 @@ class GNNML3(nn.Module):
         x = torch.tanh(self.fc1(x))
         return x
 
+class LinearNet(nn.Module):
+    def __init__(self):
+        super(LinearNet, self).__init__()
+        self.fc1 = torch.nn.Linear(dataset.num_features, 10)
+        
+    def forward(self, data):
+        x=data.x
+        edge_index=data.edge_index
+        x = global_add_pool(x, data.batch)
+        x = self.fc1(x)
+        return torch.tanh(x)
 
-MODELS = [GatNet, ChebNet, GcnNet, GinNet, MlpNet, PPGN, GNNML1, GNNML3]
+
+MODELS = [LinearNet, GatNet, ChebNet, GcnNet, GinNet, MlpNet, PPGN, GNNML1, GNNML3]
 models = {m.__name__.lower(): m for m in MODELS}
 
 if __name__ == '__main__':
@@ -309,6 +321,9 @@ if __name__ == '__main__':
 
     M=0
     NUM_ITER = 10
+    MAX_REPEATS = 10
+    last_sm = None
+    repeat_iters = 0
     for iter in range(0,NUM_ITER):
         torch.manual_seed(iter)
         
@@ -325,6 +340,14 @@ if __name__ == '__main__':
         E=torch.cat(embeddings).cpu().detach().numpy()    
         M=M+1*((np.abs(np.expand_dims(E,1)-np.expand_dims(E,0))).sum(2)>0.001)
         sm=((M==0).sum()-M.shape[0])/2
+        if last_sm == sm:
+            repeat_iters += 1
+        else:
+            repeat_iters = 0
+        last_sm = sm
+        if repeat_iters > MAX_REPEATS:
+            print(f'Finished early after {MAX_REPEATS} repeats.')
+            break
         print('similar:',sm)
     print(sm, 0.0)
 
