@@ -459,6 +459,9 @@ if __name__ == '__main__':
     bval=1000
     btest=0
     btestr2=0
+    MAX_REPEATS = 25
+    last_bval = None
+    repeat_iters = 0
     for epoch in range(1, 1001):
         trloss=train(epoch)
         test_loss,val_loss,testr2 = test()
@@ -466,6 +469,11 @@ if __name__ == '__main__':
             bval=val_loss
             btest=test_loss
             btestr2=testr2
-        
+            last_bval = bval
+            repeat_iters = 0
+        repeat_iters += 1
         print('Epoch: {:02d}, trloss: {:.6f},  Valloss: {:.6f}, Testloss: {:.6f}, best test loss: {:.6f}, bestr2:{:.6f}'.format(epoch,trloss,val_loss,test_loss,btest,btestr2))
-
+        if repeat_iters > MAX_REPEATS:
+            print(f'Finished early after {MAX_REPEATS} repeats.')
+            break
+    print(btest, 0.0)

@@ -416,11 +416,8 @@ if __name__ == '__main__':
             last_bval = bval
             repeat_iters = 0
         repeat_iters += 1
+        print('Epoch: {:02d}, trloss: {:.4f}, tracc: {:.4f}, Valloss: {:.4f}, Val acc: {:.4f},Testloss: {:.4f}, Test acc: {:.4f},best test acc: {:.4f}'.format(epoch,trloss,tracc,val_loss,val_acc,test_loss,test_acc,btest))
         if repeat_iters > MAX_REPEATS:
             print(f'Finished early after {MAX_REPEATS} repeats.')
             break
-        print('Epoch: {:02d}, trloss: {:.4f}, tracc: {:.4f}, Valloss: {:.4f}, Val acc: {:.4f},Testloss: {:.4f}, Test acc: {:.4f},best test acc: {:.4f}'.format(epoch,trloss,tracc,val_loss,val_acc,test_loss,test_acc,btest))
     print(btest, 0.0)
-
-
-
