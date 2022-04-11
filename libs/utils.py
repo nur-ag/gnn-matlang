@@ -610,6 +610,25 @@ class SRDataset(InMemoryDataset):
         data, slices = self.collate(data_list)
         torch.save((data, slices), self.processed_paths[0])
 
+# Hack to fix version issues in the EXP-Classify data set
+from torch_geometric.data.storage import GlobalStorage
+def patch_version(
+        data, 
+        fields=['x', 'edge_index', 'edge_attr', 'y', 'pos', 'norm', 'face']
+    ):
+    """Patch the global store from the object since it was created with an older PyG
+
+    Note: This is a hack! Results seem consistent across machines/installs.
+    """
+    data_dict = data.__dict__
+    store = GlobalStorage(_parent=data)
+    data_dict['_store'] = store
+    for f in fields:
+        setattr(store, f, data_dict[f])
+    return data
+
+############
+
 class SpectralDesign(object):   
 
     def __init__(self,nmax=0,recfield=1,dv=5,nfreq=5,adddegree=False,laplacien=True,addadj=False,vmax=None):
@@ -632,7 +651,13 @@ class SpectralDesign(object):
         self.nmax=nmax    
 
     def __call__(self, data):
-
+        # Patch if the store is _not_ in the object
+        # and PyG raises an exception when accessing members
+        if '_store' not in data.__dict__:
+            try:
+                _ = data.x.shape
+            except RuntimeError as e:
+                data = patch_version(data)
         n =data.x.shape[0]     
         nf=data.x.shape[1]  
 

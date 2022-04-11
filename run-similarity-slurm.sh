@@ -3,7 +3,7 @@
 #SBATCH -p high
 #SBATCH -n 1 #number of tasks
 #SBATCH -c 1
-#SBATCH --mem=16384
+#SBATCH --mem=32768
 #SBATCH --array=1-210:1
 #SBATCH --output=results/execution_logs/run.%A_%a.out
 
@@ -45,7 +45,7 @@ do
   done
 done
 # Total combinations/experiments:
-# 2 scripts x 6 models x 10 seeds x 3 distances x 3 lengths = 1080
+# 2 scripts x 7 models x 10 seeds x 3 distances x 2 lengths = 840
 TOTAL_EXPERIMENTS=${#COMMANDS_ARRAY[@]}
 TOTAL_PROCESSES=$SLURM_ARRAY_TASK_COUNT
 

@@ -3,7 +3,7 @@
 #SBATCH -p high
 #SBATCH -n 1 #number of tasks
 #SBATCH -c 1
-#SBATCH --mem=32768
+#SBATCH --mem=8192
 #SBATCH --array=1-210:1
 #SBATCH --output=results/execution_logs/run.%A_%a.out
 
