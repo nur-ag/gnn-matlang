@@ -25,7 +25,7 @@ COMMANDS_ARRAY=()
 OUTPUTS_ARRAY=()
 for SCRIPT in "mutag" "enzymes" "enzymes_contfeat" "proteins" "ptc"
 do
-  for MODEL_TYPE in "gatnet" "gcnnet" "ginnet" "chebnet" "mlpnet" "gnnml1" "gnnml3"
+  for MODEL_TYPE in "linearnet" "gatnet" "gcnnet" "ginnet" "chebnet" "mlpnet" "gnnml1" "gnnml3"
   do
     for SEED in `seq 1 $MAX_SEED`
     do
@@ -45,7 +45,7 @@ do
   done
 done
 # Total combinations/experiments:
-# 5 scripts x 7 models x 10 seeds x 3 distances x 3 lengths = 3150
+# 5 scripts x 8 models x 10 seeds x 3 distances x 3 lengths = 3600
 TOTAL_EXPERIMENTS=${#COMMANDS_ARRAY[@]}
 TOTAL_PROCESSES=$SLURM_ARRAY_TASK_COUNT
 

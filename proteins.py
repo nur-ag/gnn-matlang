@@ -286,8 +286,18 @@ class GNNML3(nn.Module):
         x = torch.cat([global_mean_pool(x, data.batch),global_max_pool(x, data.batch)],1)        
         return F.log_softmax(self.fc2(x), dim=1)
 
+class LinearNet(nn.Module):
+    def __init__(self):
+        super(LinearNet, self).__init__()
+        self.fc1 = torch.nn.Linear(dataset.num_features, 2)
+        
+    def forward(self, data):
+        x=data.x
+        edge_index=data.edge_index
+        x = global_add_pool(x, data.batch)
+        return F.log_softmax(self.fc1(x), dim=1)
 
-MODELS = [GatNet, ChebNet, GcnNet, GinNet, MlpNet, GNNML1, GNNML3]
+MODELS = [LinearNet, GatNet, ChebNet, GcnNet, GinNet, MlpNet, GNNML1, GNNML3]
 models = {m.__name__.lower(): m for m in MODELS}
 
 if __name__ == '__main__':
@@ -324,6 +334,9 @@ if __name__ == '__main__':
         d=dataset[[i for i in trid]].copy()
         ds.data.x=(ds.data.x-d.data.x.mean(0))/d.data.x.std(0)
 
+        # Patch out columns that are all 0s
+        ds.data.x[ds.data.x != ds.data.x] = 0
+        
         bsize=180
         train_loader = DataLoader(ds[[i for i in trid]], batch_size=bsize, shuffle=True)    
         test_loader  = DataLoader(ds[[i for i in tsid]], batch_size=60, shuffle=False)

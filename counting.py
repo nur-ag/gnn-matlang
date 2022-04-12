@@ -354,8 +354,18 @@ class GNNML3(nn.Module):
         x = F.relu(self.fc1(x))
         return self.fc2(x)
 
+class LinearNet(nn.Module):
+    def __init__(self):
+        super(LinearNet, self).__init__()
+        self.fc1 = torch.nn.Linear(dataset.num_features, 1)
+        
+    def forward(self, data):
+        x=data.x
+        edge_index=data.edge_index
+        x = global_add_pool(x, data.batch)
+        return self.fc1(x)
 
-MODELS = [GatNet, ChebNet, GcnNet, GinNet, MlpNet, GNNML1, GNNML3]
+MODELS = [LinearNet, GatNet, ChebNet, GcnNet, GinNet, MlpNet, GNNML1, GNNML3]
 models = {m.__name__.lower(): m for m in MODELS}
 
 if __name__ == '__main__':

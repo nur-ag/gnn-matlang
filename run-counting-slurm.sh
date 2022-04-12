@@ -26,7 +26,7 @@ COMMANDS_ARRAY=()
 OUTPUTS_ARRAY=()
 for SCRIPT_TASK in `seq 0 4`
 do
-  for MODEL_TYPE in "gatnet" "gcnnet" "ginnet" "chebnet" "mlpnet" "gnnml1" "gnnml3"
+  for MODEL_TYPE in "linearnet" "gatnet" "gcnnet" "ginnet" "chebnet" "mlpnet" "gnnml1" "gnnml3"
   do
     for SEED in `seq 1 $MAX_SEED`
     do
