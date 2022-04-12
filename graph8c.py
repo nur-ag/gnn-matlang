@@ -315,7 +315,7 @@ if __name__ == '__main__':
     # Add IGEL embeddings
     igel = IGELPreprocessor(seed, distance, vector_length)
     full_data = dataset.data.clone()
-    dataset.data = igel(full_data, dataset)
+    dataset.data = igel(full_data, dataset[:])
 
     # Follow the normal logic
     train_loader = DataLoader(dataset, batch_size=100, shuffle=False)
