@@ -45,7 +45,7 @@ do
   done
 done
 # Total combinations/experiments:
-# 2 scripts x 7 models x 10 seeds x 3 distances x 2 lengths = 840
+# 3 scripts x 7 models x 10 seeds x 3 distances x 2 lengths = 840
 TOTAL_EXPERIMENTS=${#COMMANDS_ARRAY[@]}
 TOTAL_PROCESSES=$SLURM_ARRAY_TASK_COUNT
 

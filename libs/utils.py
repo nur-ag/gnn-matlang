@@ -611,7 +611,6 @@ class SRDataset(InMemoryDataset):
         torch.save((data, slices), self.processed_paths[0])
 
 # Hack to fix version issues in the EXP-Classify data set
-from torch_geometric.data.storage import GlobalStorage
 def patch_version(
         data, 
         fields=['x', 'edge_index', 'edge_attr', 'y', 'pos', 'norm', 'face']
@@ -620,12 +619,16 @@ def patch_version(
 
     Note: This is a hack! Results seem consistent across machines/installs.
     """
-    data_dict = data.__dict__
-    store = GlobalStorage(_parent=data)
-    data_dict['_store'] = store
-    for f in fields:
-        setattr(store, f, data_dict[f])
-    return data
+    try:
+        from torch_geometric.data.storage import GlobalStorage
+        data_dict = data.__dict__
+        store = GlobalStorage(_parent=data)
+        data_dict['_store'] = store
+        for f in fields:
+            setattr(store, f, data_dict[f])
+        return data
+    except Error as e:
+        return data
 
 ############
 
