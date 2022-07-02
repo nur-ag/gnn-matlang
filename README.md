@@ -1,4 +1,22 @@
-# Breaking the Limits of Message Passing Graph Neural Networks
+# IGEL - MP-GNN Benchmark
+
+This repository contains a replica of [this 
+repository associated with the paper "Breaking the 
+Limits of Message Passing Graph Neural Networks" 
+published in ICML2021](https://github.com/balcilar/gnn-matlang). It extends the provided 
+reproducibility scripts so that: 
+
+1. IGEL is introduced in the graphlet counting (`counting.py`), isomorphism detection 
+(`sr25.py`, `graph8c.py`, and `exp_classify.py`), and graph classification (`mutag.py`, 
+`ptc.py`, `proteins.py` and `enzymes.py`).
+2. The results of the original paper can be reproduced with different seeds using Slurm.
+3. The results can be evaluated and fed into our IGEL paper.
+
+For details on IGEL, visit the [main repository here](https://github.com/nur-ag/IGEL).
+
+# Original README.
+
+## Breaking the Limits of Message Passing Graph Neural Networks
 
 This repository consists of codes of ["Breaking the Limits of Message Passing Graph Neural Networks"](https://arxiv.org/pdf/2106.04319.pdf) paper published in ICML2021.
 
