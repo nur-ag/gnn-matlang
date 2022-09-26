@@ -18,6 +18,18 @@ print(ttest_ind_from_stats(
     91.1, 7.0, 10
 ))
 
+print("Mutag: IGEL + GNNML3 vs NestedGNN")
+print(ttest_ind_from_stats(
+    92.50, 1.178511302, 10,
+    87.9, 8.2, 10
+))
+
+print("Mutag: IGEL + GNNML3 vs GNN-AK")
+print(ttest_ind_from_stats(
+    92.50, 1.178511302, 10,
+    91.7, 7.0, 10
+))
+
 print("Proteins: IGEL + GCN vs k-hop")
 print(ttest_ind_from_stats(
     75.6666667, 0.346193, 10,
@@ -36,17 +48,26 @@ print(ttest_ind_from_stats(
     76.7, 4.1, 10
 ))
 
+print("Proteins: IGEL + GCN vs NestedGNN")
+print(ttest_ind_from_stats(
+    75.6666667, 0.346193, 10,
+    74.2, 3.7, 10
+))
+
+print("Proteins: IGEL + GCN vs GNN-AK")
+print(ttest_ind_from_stats(
+    75.6666667, 0.346193, 10,
+    77.1, 5.7, 10
+))
+
 print("PTC: IGEL + GAT vs k-hop")
 print('--')
 
-print("PTC: IGEL + GAT vs GSN")
-print(ttest_ind_from_stats(
-    66.29411765, 1.264667882, 10,
-    68.2, 7.2, 10
-))
+print("PTC: IGEL + GAT vs NestedGNN")
+print('--')
 
-print("PTC: IGEL + GAT vs ESAN")
+print("PTC: IGEL + GAT vs GNN-AK")
 print(ttest_ind_from_stats(
     66.29411765, 1.264667882, 10,
-    69.2, 6.5, 10
+    67.7, 8.8, 10
 ))
