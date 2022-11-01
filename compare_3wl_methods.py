@@ -30,6 +30,12 @@ print(ttest_ind_from_stats(
     91.7, 7.0, 10
 ))
 
+print("Mutag: IGEL + GNNML3 vs ID-GNN")
+print(ttest_ind_from_stats(
+    92.50, 1.178511302, 10,
+    93.0, 5.6, 10
+))
+
 print("Proteins: IGEL + GCN vs k-hop")
 print(ttest_ind_from_stats(
     75.6666667, 0.346193, 10,
@@ -60,6 +66,12 @@ print(ttest_ind_from_stats(
     77.1, 5.7, 10
 ))
 
+print("Proteins: IGEL + GCN vs ID-GNN")
+print(ttest_ind_from_stats(
+    75.6666667, 0.346193, 10,
+    77.9, 2.4, 10
+))
+
 print("PTC: IGEL + GAT vs k-hop")
 print('--')
 
@@ -71,3 +83,10 @@ print(ttest_ind_from_stats(
     66.29411765, 1.264667882, 10,
     67.7, 8.8, 10
 ))
+
+print("PTC: IGEL + GAT vs ID-GNN")
+print(ttest_ind_from_stats(
+    66.29411765, 1.264667882, 10,
+    62.5, 5.3, 10
+))
+
