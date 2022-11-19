@@ -49,7 +49,7 @@ exp_control_df.loc[exp_control_df.experiment == 'exp_classify','t_stat':] *= -1
 
 hypotheses = results_df.model.unique().size
 sig_bonferroni = SIGNIFICANCE / hypotheses
-best_sig_df = exp_control_df[(exp_control_df.distance > 0) | (exp_control_df.experiment == 'gnnml3')].groupby(['experiment', 'model']).t_stat.min()
+best_sig_df = exp_control_df[exp_control_df.distance > 0].groupby(['experiment', 'model']).t_stat.min()
 best_exp_control_df = exp_control_df.merge(best_sig_df, on=['experiment', 'model', 't_stat'], how='inner')
 best_exp_control_df['is_significative_diff'] = best_exp_control_df.p_value < sig_bonferroni
 best_exp_control_df.loc[best_exp_control_df.experiment == 'exp_classify','t_stat'] *= -1

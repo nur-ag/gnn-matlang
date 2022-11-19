@@ -4,7 +4,7 @@ NUM_EXPERIMENTS=10
 PIDS=""
 
 # Run all experiments in parallel but each model type and config sequentially
-for SCRIPT_FILE in "mutag" "enzymes" "enzymes_contfeat" "proteins" "ptc"
+for SCRIPT_FILE in "Zinc12k" "mutag" "enzymes" "enzymes_contfeat" "proteins" "ptc"
 do
   echo "$SCRIPT_FILE is now running..."
   {

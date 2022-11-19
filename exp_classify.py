@@ -310,6 +310,7 @@ if __name__ == '__main__':
     vector_length = int(sys.argv[3].strip()) if len(sys.argv) > 3 else 1
     model_class = models[sys.argv[4].lower().strip() if len(sys.argv) > 4 else 'gnnml3']
     try_cuda = sys.argv[5] == 'cuda' if len(sys.argv) > 5 else True
+    use_relative = sys.argv[6] == 'relative' if len(sys.argv) > 6 else False
     torch.manual_seed(seed)
 
     device = torch.device('cuda' if torch.cuda.is_available() and try_cuda else 'cpu')
@@ -324,7 +325,7 @@ if __name__ == '__main__':
     TRAINING_OPTIONS.epochs = 0
 
     # Add IGEL embeddings
-    igel = IGELPreprocessor(seed, distance, vector_length)
+    igel = IGELPreprocessor(seed, distance, vector_length, use_relative)
     data_pre_igel = dataset.data.clone()
     train_data = dataset[[i for i in range(400, 1200)]]
     data_with_igel = igel(data_pre_igel, train_data)

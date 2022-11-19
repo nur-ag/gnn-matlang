@@ -9,17 +9,9 @@ from torch_geometric.nn import (GINConv,global_add_pool,GATConv,ChebConv,GCNConv
 from libs.spect_conv import SpectConv,ML3Layer
 from libs.utils import Zinc12KDataset,SpectralDesign,get_n_params
 
-transform = SpectralDesign(nmax=37,recfield=2,dv=2,nfreq=7) 
 
-dataset = Zinc12KDataset(root="dataset/ZINC/",pre_transform=transform)
-
-trid=list(range(0,10000))
-vlid=list(range(10000,11000))
-tsid=list(range(11000,12000))
-
-train_loader = DataLoader(dataset[trid], batch_size=64, shuffle=True)
-val_loader = DataLoader(dataset[vlid], batch_size=64, shuffle=False)
-test_loader = DataLoader(dataset[tsid], batch_size=64, shuffle=False)
+import sys
+from igel_utils import IGELPreprocessor, LambdaReduceTransform
 
 
 class PPGN(nn.Module):
@@ -288,7 +280,7 @@ class GNNML1(nn.Module):
         x=data.x  
               
         edge_index=data.edge_index
-        edge_attr=torch.ones(edge_index.shape[1],1).to('cuda')
+        edge_attr=torch.ones(edge_index.shape[1],1).to(device)
         
         if self.concat:            
             x = torch.cat([F.relu(self.fc11(x)), F.relu(self.conv11(x, edge_index,edge_attr)),F.relu(self.fc12(x)*self.fc13(x))],1)
@@ -344,62 +336,105 @@ class GNNML3(nn.Module):
         x = F.relu(self.fc1(x))
         return self.fc2(x)
 
-
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-model = GNNML3().to(device)   # GatNet  ChebNet  GcnNet  GinNet  MlpNet  PPGN GNNML1 GNNML3 
-optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-
-print(get_n_params(model))
-
-def train(epoch):
-    model.train()
-    
-    L=0
-    correct=0
-    for data in train_loader:
-        data = data.to(device)
-        optimizer.zero_grad()
+class LinearNet(nn.Module):
+    def __init__(self):
+        super(LinearNet, self).__init__()
+        self.fc1 = torch.nn.Linear(dataset.num_features, 1)
         
-        pre=model(data)
-        #lss= torch.square(pre- data.y.unsqueeze(-1)).sum() 
-        lss= torch.nn.functional.l1_loss(pre, data.y.unsqueeze(-1),reduction='sum')
+    def forward(self, data):
+        x=data.x
+        edge_index=data.edge_index
+        x = global_add_pool(x, data.batch)
+        x = self.fc1(x)
+        return torch.tanh(x)
+
+
+MODELS = [LinearNet, GatNet, ChebNet, GcnNet, GinNet, MlpNet, PPGN, GNNML1, GNNML3]
+models = {m.__name__.lower(): m for m in MODELS}
+
+if __name__ == '__main__':
+    seed = int(sys.argv[1].strip()) if len(sys.argv) > 1 else 0
+    distance = int(sys.argv[2].strip()) if len(sys.argv) > 2 else 1
+    vector_length = int(sys.argv[3].strip()) if len(sys.argv) > 3 else 1
+    model_class = models[sys.argv[4].lower().strip() if len(sys.argv) > 4 else 'gnnml3']
+    try_cuda = sys.argv[5] == 'cuda' if len(sys.argv) > 5 else True
+    use_relative = sys.argv[6] == 'relative' if len(sys.argv) > 6 else False
+    torch.manual_seed(seed)
+
+    transform = SpectralDesign(nmax=37,recfield=2,dv=2,nfreq=7) 
+
+    dataset = Zinc12KDataset(root="dataset/ZINC/",pre_transform=transform)
+
+    trid=list(range(0,10000))
+    vlid=list(range(10000,11000))
+    tsid=list(range(11000,12000))
+
+    # Add IGEL embeddings
+    igel = IGELPreprocessor(seed, distance, vector_length, use_relative)
+    data_pre_igel = dataset.data.clone()
+    train_data = dataset[[i for i in trid]]
+    data_with_igel = igel(data_pre_igel, train_data)
+    dataset.data = data_with_igel
+
+    train_loader = DataLoader(dataset[trid], batch_size=64, shuffle=True)
+    val_loader = DataLoader(dataset[vlid], batch_size=64, shuffle=False)
+    test_loader = DataLoader(dataset[tsid], batch_size=64, shuffle=False)
+
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    model = model_class().to(device)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+
+    print(get_n_params(model))
+
+    def train(epoch):
+        model.train()
         
-        lss.backward()
-        optimizer.step()  
-        L+=lss.item()
+        L=0
+        correct=0
+        for data in train_loader:
+            data = data.to(device)
+            optimizer.zero_grad()
+            
+            pre=model(data)
+            #lss= torch.square(pre- data.y.unsqueeze(-1)).sum() 
+            lss= torch.nn.functional.l1_loss(pre, data.y.unsqueeze(-1),reduction='sum')
+            
+            lss.backward()
+            optimizer.step()  
+            L+=lss.item()
 
-    return L/len(trid)
+        return L/len(trid)
 
-def test():
-    model.eval()
-    
-    L=0
-    for data in test_loader:
-        data = data.to(device)
-
-        pre=model(data)
-        #lss= torch.square(pre- data.y.unsqueeze(-1)).sum() 
-        lss= torch.nn.functional.l1_loss(pre, data.y.unsqueeze(-1),reduction='sum')      
-        L+=lss.item()
-    
-    Lv=0
-    for data in val_loader:
-        data = data.to(device)
-        pre=model(data)
-        #lss= torch.square(pre- data.y.unsqueeze(-1)).sum() 
-        lss= torch.nn.functional.l1_loss(pre, data.y.unsqueeze(-1),reduction='sum')
-        Lv+=lss.item()    
-    return L/len(tsid), Lv/len(vlid)
-
-bval=1000
-btest=0
-for epoch in range(1, 401):
-    trloss=train(epoch)
-    test_loss,val_loss = test()
-    if bval>val_loss:
-        bval=val_loss
-        btest=test_loss
+    def test():
+        model.eval()
         
-    #print('Epoch: {:02d}, trloss: {:.4f},  Val: {:.4f}, Test: {:.4f}'.format(epoch,trloss,val_acc, test_acc))
-    print('Epoch: {:02d}, trloss: {:.4f},  Valloss: {:.4f}, Testloss: {:.4f}, best test loss: {:.4f}'.format(epoch,trloss,val_loss,test_loss,btest))
+        L=0
+        for data in test_loader:
+            data = data.to(device)
 
+            pre=model(data)
+            #lss= torch.square(pre- data.y.unsqueeze(-1)).sum() 
+            lss= torch.nn.functional.l1_loss(pre, data.y.unsqueeze(-1),reduction='sum')      
+            L+=lss.item()
+        
+        Lv=0
+        for data in val_loader:
+            data = data.to(device)
+            pre=model(data)
+            #lss= torch.square(pre- data.y.unsqueeze(-1)).sum() 
+            lss= torch.nn.functional.l1_loss(pre, data.y.unsqueeze(-1),reduction='sum')
+            Lv+=lss.item()    
+        return L/len(tsid), Lv/len(vlid)
+
+    bval=1000
+    btest=0
+    for epoch in range(1, 401):
+        trloss=train(epoch)
+        test_loss,val_loss = test()
+        if bval>val_loss:
+            bval=val_loss
+            btest=test_loss
+            
+        #print('Epoch: {:02d}, trloss: {:.4f},  Val: {:.4f}, Test: {:.4f}'.format(epoch,trloss,val_acc, test_acc))
+        print('Epoch: {:02d}, trloss: {:.4f},  Valloss: {:.4f}, Testloss: {:.4f}, best test loss: {:.4f}'.format(epoch,trloss,val_loss,test_loss,btest))
+    print(btest, 0.0)

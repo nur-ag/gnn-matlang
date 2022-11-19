@@ -51,11 +51,12 @@ gs = [nx_to_ig(G) for G in input_gs]
 # And also the 'total' IGEL encodings subsuming all values of alpha
 total_encs = []
 max_diam = int(sys.argv[2]) if len(sys.argv) >= 3 else max([G.diameter() for G in gs])
+use_relative_degrees = sys.argv[3].lower() == 'relative' if len(sys.argv) >= 4 else False
 encs = [[] for _ in range(max_diam)]
 for G in gs:
     total_enc = []
     for distance in range(1, max_diam + 1):
-        igel_enc = StructuralMapper(G, distance=distance, use_distances=True, cache_field=f'igel_d{distance}', num_workers=1)
+        igel_enc = StructuralMapper(G, distance=distance, use_distances=True, use_relative_degrees=use_relative_degrees, cache_field=f'igel_d{distance}_rel_{use_relative_degrees}', num_workers=1)
         igel_result = Counter([tuple(sorted(zip(*x))) for x in igel_enc.mapping(G.vs, G)]).most_common()
         result_tuple = (distance, tuple(igel_result))
         total_enc.append(result_tuple)
@@ -63,7 +64,7 @@ for G in gs:
     total_enc = tuple(total_enc)
     total_encs.append(total_enc)
 
-verbose = sys.argv[3].lower() == 'print' if len(sys.argv) >= 3 else False
+verbose = sys.argv[4].lower() == 'print' if len(sys.argv) >= 5 else False
 if verbose:
     print(f"The max. diameter is {max_diam}.")
     print(f"The encodings are: {[set(enc) for enc in encs]}")

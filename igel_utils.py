@@ -24,6 +24,7 @@ class IGELPreprocessor:
             seed=0, 
             distance=1, 
             vector_length=5,
+            use_relative_degrees=False,
             node_feature_fields=['x'], 
             edge_feature_map={'edge_index': 'edge_attr', 'edge_index2': 'edge_attr2'},
             edge_fn=lambda x, y: x * y):
@@ -31,6 +32,7 @@ class IGELPreprocessor:
         self.seed = seed
         self.vector_length = vector_length
         self.use_encoding = vector_length < 0
+        self.use_relative_degrees = use_relative_degrees
         self.node_feature_fields = node_feature_fields
         self.edge_feature_map = edge_feature_map
         self.edge_fn = edge_fn
@@ -128,6 +130,7 @@ class IGELPreprocessor:
                                          self.distance, 
                                          self.seed,
                                          embedder_length,
+                                         self.use_relative_degrees,
                                          train_opts=TRAINING_OPTIONS)
 
         # If we are using encodings, override the parameter matrix

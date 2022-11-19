@@ -375,6 +375,7 @@ if __name__ == '__main__':
     model_class = models[sys.argv[4].lower().strip() if len(sys.argv) > 4 else 'gnnml3']
     try_cuda = sys.argv[5] == 'cuda' if len(sys.argv) > 5 else True
     task = int(sys.argv[6].strip()) if len(sys.argv) > 6 else 0
+    use_relative = sys.argv[7] == 'relative' if len(sys.argv) > 7 else False
     torch.manual_seed(seed)
 
     transform = SpectralDesign(nmax=30,recfield=1,dv=1,nfreq=10,adddegree=True,laplacien=False,addadj=True)
@@ -391,7 +392,7 @@ if __name__ == '__main__':
     tsid=a['test_idx'][0]
 
     # Add IGEL embeddings
-    igel = IGELPreprocessor(seed, distance, vector_length)
+    igel = IGELPreprocessor(seed, distance, vector_length, use_relative)
     data_pre_igel = dataset.data.clone()
     train_data = dataset[[i for i in trid]]
     data_with_igel = igel(data_pre_igel, train_data)
